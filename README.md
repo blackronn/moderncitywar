@@ -2,10 +2,10 @@
 
 > **"İki belediye başkanı, tek harita."** — 2 kişilik online şehir kurma + savaş oyunu.
 
-Simetrik bir pixel-art haritanın iki yakasında birer şehir. Ortada nehir, 2–3 köprü.
-Herkes **Belediye Binası + 1 işçiyle** başlar; işçiyle odun/taş toplar, ev/sera/banka
-kurar, nüfusunu büyütür. Oyun **barışta** başlar — saldırmak imkânsızdır. Ta ki biri
-**"Savaş İlan Et"** deyip 30 saniyelik sireni başlatana kadar.
+Simetrik bir pixel-art haritanın iki yakasında birer şehir. Üç harita tipi (seed seçer):
+**Nehir** (2–3 köprü, doğal cephe hattı), **Göl** (kıyılardan dolaşılır) ve **Ova**
+(açık cephe, bol orman). Herkes **Belediye Binası + 1 işçiyle** başlar; işçiyle odun/taş
+toplar, şehir kurar, nüfusunu büyütür — ve **istediği an saldırır** (ilan yok, siren yok).
 
 **İki zafer yolu:**
 
@@ -54,9 +54,16 @@ Oyunu aç (`tools\godot.ps1 --path .`) — bir oyuncu **Oyun Kur**, diğeri **Oy
 
 ### Birimler ve counter üçgeni
 
-İşçi (toplar/inşa eder) · **Piyade** (ucuz) · **Nişancı** (uzun menzil, piyadeye ×2) ·
-**RPG'ci** (zırh/binaya ×2.5) · **Tank** (piyadeye ×1.5, etli). Piyade yaklaşırsa
-nişancıyı döver; RPG tankı eritir; tank piyadeyi biçer. Taret şehrini savunur.
+İşçi (toplar/inşa eder; yarım inşaata sağ tıkla devam ettirir) · **Piyade** (ucuz) ·
+**Nişancı** (uzun menzil, piyadeye ×2) · **RPG'ci** (zırh/binaya ×2.5) · **Tank**
+(piyadeye ×1.5, etli) · **Sıhhiyeci** (hasarlı dostları kendiliğinden iyileştirir).
+Piyade yaklaşırsa nişancıyı döver; RPG tankı eritir; tank piyadeyi biçer. Taret savunur.
+
+### Ekonomi ve geliştirme
+
+Odun/taş işçiyle; **Sera** yemek, **Banka** para, **Keresteci** odun, **Taş Ocağı** taş
+üretir (pasif). Binalar **L3'e kadar geliştirilir** — buton, maliyeti ve kazancı açıkça
+yazar: ev +2 nüfus, üretim binaları +%50 hız, taret +5 hasar, kışla/fabrika %15 hızlı eğitim.
 
 ## Geliştirme
 
