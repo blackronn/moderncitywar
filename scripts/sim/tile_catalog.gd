@@ -110,8 +110,11 @@ static func unit_texture(def_id: StringName, pid: int) -> Texture2D:
 	match def_id:
 		&"worker":
 			return atlas(TOWN, PEASANT)
-		&"rifleman", &"sniper":
+		&"rifleman":
 			return atlas(BATTLE, Vector2i(SOLDIER_RIFLE_COL, VEHICLE_BAND[pid]))
+		&"sniper":
+			# oyuna ozel uretilmis sprite (tools/gen_sprites.gd)
+			return load("res://assets/generated/sniper_p%d.png" % pid) as Texture2D
 		&"rpg":
 			return atlas(BATTLE, Vector2i(SOLDIER_HEAVY_COL, VEHICLE_BAND[pid]))
 		&"tank":

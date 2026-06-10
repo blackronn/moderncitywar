@@ -185,12 +185,27 @@ func handle_cancel_train(pid: int, building_id: int, index: int) -> void:
 		b.queue_t = D.unit(b.queue[0])["train_s"]
 
 
-func handle_attack(_pid: int, _ids: PackedInt32Array, _target_id: int) -> void:
-	pass   # M2
+func handle_attack(pid: int, ids: PackedInt32Array, target_id: int) -> void:
+	if GameState.war_state != D.War.WAR:
+		Net.reject_to(pid, D.Reject.PEACE)
+		return
+	var tgt: Node = GameState.ent(target_id)
+	if tgt == null or tgt.owner_pid == pid:
+		return
+	for u in _owned_units(pid, ids):
+		if u.def["dmg"] > 0:
+			u.task = {"kind": &"attack", "tid": target_id, "cell": _cell_of(tgt)}
+			u.repath_block = 0
+		else:
+			_set_move(u, _cell_of(tgt))   # silahsizlar (isci) sadece yurur
 
 
-func handle_declare_war(_pid: int) -> void:
-	pass   # M2
+func handle_declare_war(pid: int) -> void:
+	if GameState.war_state != D.War.PEACE:
+		return
+	Net.ev(D.Ev.WAR_STATE, [D.War.COUNTDOWN, D.WAR_COUNTDOWN_S])
+	Net.toast_to(pid, &"war_declared_by_you")
+	Net.toast_to(GameState.enemy_of(pid), &"war_declared_by_enemy")
 
 
 func force_game_over(winner: int, reason: int) -> void:
@@ -303,6 +318,9 @@ func _tick_units(dt: float) -> void:
 					pass   # vardi; bitisiklik kontrolu gelecek tick
 				else:
 					u.flags |= D.FLAG_MOVING
+			&"attack":
+				pass   # hareket + ates _tick_combat'ta
+	_separate_units()
 	for bid in builders_on:
 		var b: Node = GameState.ent(bid)
 		if b == null:
@@ -314,8 +332,140 @@ func _tick_units(dt: float) -> void:
 			_res_dirty = true
 
 
-func _tick_combat(_dt: float) -> void:
-	pass   # M2
+func _tick_combat(dt: float) -> void:
+	# geri sayim
+	if GameState.war_state == D.War.COUNTDOWN:
+		GameState.war_t_left = maxf(0.0, GameState.war_t_left - dt)
+		if GameState.war_t_left <= 0.0:
+			Net.ev(D.Ev.WAR_STATE, [D.War.WAR, 0.0])
+			Net.ev(D.Ev.TOAST_KEY, [&"war_began"])
+	if GameState.war_state != D.War.WAR:
+		return
+	# birimler
+	for u in _units():
+		if u.def["dmg"] <= 0:
+			continue
+		u.cooldown = maxf(0.0, u.cooldown - dt)
+		var tgt: Node = null
+		if u.task.get("kind") == &"attack":
+			tgt = GameState.ent(u.task.get("tid", 0))
+			if tgt == null:
+				u.task = {"kind": &"idle"}
+		if tgt == null and u.task.get("kind") == &"idle":
+			tgt = _nearest_enemy(u, u.def["aggro_t"])
+			if tgt != null:
+				u.task = {"kind": &"attack", "tid": tgt.id, "cell": _cell_of(tgt)}
+				u.repath_block = 0
+		if tgt != null:
+			_combat_step(u, tgt, dt)
+	# taretler
+	for b in _buildings():
+		if b.def.get("dmg", 0) <= 0 or not b.is_complete():
+			continue
+		b.cooldown = maxf(0.0, b.cooldown - dt)
+		var tgt := _nearest_enemy(b, b.def["range_t"])
+		if tgt != null and b.cooldown <= 0.0:
+			_fire(b, tgt)
+
+
+func _combat_step(u: Node, tgt: Node, dt: float) -> void:
+	var dist := _dist_t(u, tgt)
+	if dist <= float(u.def["range_t"]):
+		u.path.clear()   # atama degil: u.path tipli Array, Variant uzerinden [] atanamaz
+		u.path_i = 0
+		u.flags |= D.FLAG_ATTACKING
+		if u.cooldown <= 0.0:
+			_fire(u, tgt)
+		return
+	# kovala: hedef yer degistirdiyse yeniden yol (15 tick frenli)
+	u.flags |= D.FLAG_MOVING
+	if u.repath_block > 0:
+		u.repath_block -= 1
+	var goal := _cell_of(tgt)
+	var need: bool = u.path_i >= u.path.size()
+	if not need and u.repath_block <= 0 and not u.path.is_empty():
+		var endc: Vector2i = u.path[u.path.size() - 1]
+		need = maxi(absi(endc.x - goal.x), absi(endc.y - goal.y)) > 1
+	if need:
+		u.task["cell"] = goal
+		u.path = pathing.find(u.cell(), goal, true)
+		u.path_i = 0
+		u.repath_block = 15
+	_follow(u, dt)
+
+
+func _fire(att: Node, tgt: Node) -> void:
+	att.cooldown = att.def["cooldown_s"]
+	var dmg := attack_damage(att.def_id, att.def, tgt.def_id, tgt.def, _dist_t(att, tgt))
+	tgt.set_hp(tgt.hp - dmg)
+	Net.ev(D.Ev.TRACER, [att.position, tgt.position])
+	if tgt.hp <= 0.0:
+		_kill(tgt)
+
+
+func _kill(tgt: Node) -> void:
+	var was_hall: bool = tgt.def_id == &"city_hall"
+	var owner: int = tgt.owner_pid
+	despawn(tgt, 1)
+	if was_hall and GameState.result.is_empty():
+		Net.game_over(GameState.enemy_of(owner), D.Reason.DESTRUCTION)
+
+
+static func attack_damage(att_id: StringName, att: Dictionary, def_id: StringName,
+		dfn: Dictionary, dist_t: float) -> float:
+	## Saf hasar hesabi: matris + counter istisnalari. Testler dogrudan cagirir.
+	var att_klass: int = att.get("klass", D.Klass.BUILDING)
+	var def_klass: int = dfn.get("klass", D.Klass.BUILDING)
+	var mult: float = D.DMG_MATRIX[att_klass][def_klass]
+	if att_id == &"sniper" and def_klass == D.Klass.INFANTRY:
+		mult = D.SNIPER_VS_INFANTRY
+	elif att_id == &"rpg" and (def_klass == D.Klass.ARMOR or def_klass == D.Klass.BUILDING):
+		mult = D.RPG_VS_ARMOR_BUILDING
+	elif att_id == &"rifleman" and def_id == &"sniper" and dist_t <= D.RIFLE_VS_SNIPER_RANGE_T:
+		mult = D.RIFLE_VS_SNIPER_CLOSE
+	return float(att["dmg"]) * mult
+
+
+func _dist_t(a: Node, b: Node) -> float:
+	## Iki varlik arasi mesafe (tile); binalarda footprint'in en yakin noktasi.
+	var p: Vector2 = a.position
+	var q: Vector2 = b.position
+	if b.def.has("size"):
+		var rb: Rect2 = b.footprint_px()
+		q = p.clamp(rb.position, rb.position + rb.size)
+	if a.def.has("size"):
+		var ra: Rect2 = a.footprint_px()
+		p = q.clamp(ra.position, ra.position + ra.size)
+	return p.distance_to(q) / float(D.TILE)
+
+
+func _nearest_enemy(e: Node, range_t: float) -> Node:
+	## Menzildeki en yakin dusman; birimler binalara tercih edilir.
+	var enemy := GameState.enemy_of(e.owner_pid)
+	var best_u: Node = null
+	var bu := 1e9
+	var best_b: Node = null
+	var bb := 1e9
+	for o in GameState.entities.values():
+		if o.owner_pid != enemy:
+			continue
+		var d := _dist_t(e, o)
+		if d > range_t:
+			continue
+		if o.def.has("speed_t"):
+			if d < bu:
+				bu = d
+				best_u = o
+		elif d < bb:
+			bb = d
+			best_b = o
+	return best_u if best_u != null else best_b
+
+
+func _cell_of(e: Node) -> Vector2i:
+	if e.def.has("size"):
+		return e.cell
+	return e.cell()
 
 
 func _check_victory() -> void:
@@ -330,6 +480,33 @@ func _broadcast_snapshot() -> void:
 	while i < ents.size():
 		Net.bc_snapshot(Net.encode_snapshot(ents.slice(i, i + D.SNAP_MAX_ENTS)))
 		i += D.SNAP_MAX_ENTS
+
+
+func _separate_units() -> void:
+	## Ayni hucrede ust uste binen birimleri yumusakca iter (fizik yok).
+	var buckets := {}
+	for u in _units():
+		var c: Vector2i = u.cell()
+		if not buckets.has(c):
+			buckets[c] = []
+		buckets[c].append(u)
+	for c in buckets:
+		var arr: Array = buckets[c]
+		if arr.size() < 2:
+			continue
+		for i in arr.size():
+			for j in range(i + 1, arr.size()):
+				var a: Node = arr[i]
+				var b: Node = arr[j]
+				var dv: Vector2 = a.position - b.position
+				var dl := dv.length()
+				if dl >= 10.0:
+					continue
+				var push := dv.normalized() * 0.5 if dl > 0.01 else Vector2(0.5, 0.0)
+				if not pathing.is_solid(_px_to_cell(a.position + push)):
+					a.position += push
+				if not pathing.is_solid(_px_to_cell(b.position - push)):
+					b.position -= push
 
 
 # === hareket / toplama ic mantigi ===

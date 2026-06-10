@@ -35,4 +35,9 @@ func _go() -> void:
 	}
 	for uid: StringName in u_offsets:
 		sim.spawn_unit(uid, 1, sim.cell_center(tl + u_offsets[uid]))
+	# catisma onizlemesi: kuzeyden yaklasan dusman mangasi + dogrudan savas hali
+	sim.spawn_unit(&"rifleman", 2, sim.cell_center(tl + Vector2i(4, -4)))
+	sim.spawn_unit(&"rifleman", 2, sim.cell_center(tl + Vector2i(5, -3)))
+	sim.spawn_unit(&"tank", 2, sim.cell_center(tl + Vector2i(6, -4)))
 	sim.recount_pop()
+	Net.ev(D.Ev.WAR_STATE, [D.War.WAR, 0.0])

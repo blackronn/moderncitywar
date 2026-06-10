@@ -14,6 +14,7 @@ var input_ctrl: Node = null
 var res_labels := {}
 var pop_label: Label
 var war_label: Label
+var war_btn: Button
 var toasts: VBoxContainer
 var bottom: PanelContainer
 var sel_label: Label
@@ -50,6 +51,13 @@ func _ready() -> void:
 	var stretch := Control.new()
 	stretch.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.add_child(stretch)
+	war_btn = Button.new()
+	war_btn.text = Tr.t(&"declare_war")
+	war_btn.add_theme_font_override("font", FONT)
+	war_btn.add_theme_font_size_override("font_size", 8)
+	war_btn.modulate = Color(1.0, 0.75, 0.7)
+	war_btn.pressed.connect(Net.send_declare_war)
+	bar.add_child(war_btn)
 	war_label = _mk_label(10)
 	war_label.text = Tr.t(&"peace")
 	war_label.modulate = Color(0.6, 0.95, 0.6)
@@ -164,6 +172,7 @@ func _on_res(pid: int) -> void:
 
 
 func _on_war(state: int, _t_left: float) -> void:
+	war_btn.visible = state == D.War.PEACE
 	match state:
 		D.War.PEACE:
 			war_label.text = Tr.t(&"peace")

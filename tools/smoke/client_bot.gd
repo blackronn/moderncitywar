@@ -1,15 +1,21 @@
 extends Node
-## M1 istemci botu: UI'in kullandigi ayni Net.send_* yolundan isciyle odun
-## toplar (120'ye kadar), ev kurar, nufus kapasitesinin 5->9 olmasini bekler.
+## M2 istemci botu (tum komutlar gercek rpc yolundan):
+## 1) baristayken saldiri dener -> PEACE reddi gelmeli
+## 2) savas ilan eder, geri sayimin WAR'a donmesini bekler
+## 3) orduyu dusman Belediyesi'ne surer
+## 4) iki ucta da winner=2 game_over gelince SMOKE_PASS_CLIENT
 
 const D := preload("res://scripts/autoload/defs.gd")
 const TIMEOUT_S := 110.0
 
-var _done := false
+var _finished := false
+var _peace_reject := false
 
 
 func _ready() -> void:
 	get_tree().create_timer(TIMEOUT_S).timeout.connect(_fail)
+	Bus.game_over.connect(_on_over)
+	Bus.build_rejected.connect(_on_reject)
 	if GameState.match_running:
 		_run()
 	else:
@@ -17,82 +23,82 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	var worker := _find_own(&"worker")
-	if worker == null:
-		_fail()
-		return
-	var forest := _nearest_tile(worker.cell(), D.Tile.FOREST)
-	if forest == Vector2i(-1, -1):
-		_fail()
-		return
-	print("BOT_CLIENT gather -> ", forest)
-	Net.send_gather(PackedInt32Array([worker.id]), forest)
-	while not _done and GameState.res[2]["wood"] < 120.0:
+	# host'un spawn ettigi orduyu bekle
+	while not _finished and _army().size() < 4:
 		await get_tree().create_timer(0.25).timeout
-	if _done:
+	if _finished:
 		return
-	var hall := _find_own(&"city_hall")
+	var hall := _enemy_hall()
 	if hall == null:
 		_fail()
 		return
-	var tl := _house_spot(hall)
-	if tl == Vector2i(-99, -99):
+	var ids := PackedInt32Array()
+	for u in _army():
+		ids.append(u.id)
+
+	# 1) baris reddi
+	Net.send_attack(ids, hall.id)
+	var waited := 0.0
+	while not _finished and not _peace_reject and waited < 10.0:
+		await get_tree().create_timer(0.25).timeout
+		waited += 0.25
+	if _finished:
+		return
+	if not _peace_reject:
+		printerr("SMOKE_FAIL_CLIENT baris reddi gelmedi")
 		_fail()
 		return
-	print("BOT_CLIENT build house -> ", tl)
-	Net.send_build(&"house", tl, PackedInt32Array([worker.id]))
-	while not _done and GameState.pop_cap[2] < 9:
+	print("BOT_CLIENT baris reddi OK")
+
+	# 2) savas ilani + geri sayim
+	Net.send_declare_war()
+	while not _finished and GameState.war_state != D.War.WAR:
 		await get_tree().create_timer(0.25).timeout
-	if _done:
+	if _finished:
 		return
-	_done = true
-	print("SMOKE_PASS_CLIENT")
-	await get_tree().create_timer(0.5).timeout
-	get_tree().quit(0)
+	print("BOT_CLIENT savas basladi")
+
+	# 3) saldiri
+	Net.send_attack(ids, hall.id)
+	# 4) sonucu _on_over bekler
 
 
-func _find_own(def_id: StringName) -> Node:
+func _army() -> Array:
+	var out: Array = []
 	for e in GameState.entities.values():
-		if e.owner_pid == GameState.my_pid and e.def_id == def_id:
+		if e.owner_pid == 2 and e.def.has("speed_t") and e.def["dmg"] > 0:
+			out.append(e)
+	return out
+
+
+func _enemy_hall() -> Node:
+	for e in GameState.entities.values():
+		if e.owner_pid == 1 and e.def_id == &"city_hall":
 			return e
 	return null
 
 
-func _nearest_tile(from_c: Vector2i, kind: int) -> Vector2i:
-	var best := Vector2i(-1, -1)
-	var best_d := 99999
-	for y in D.MAP_H:
-		for x in D.MAP_W:
-			if GameState.grid[y * D.MAP_W + x] != kind:
-				continue
-			var dd := maxi(absi(x - from_c.x), absi(y - from_c.y))
-			if dd < best_d:
-				best_d = dd
-				best = Vector2i(x, y)
-	return best
+func _on_reject(reason: int) -> void:
+	if reason == D.Reject.PEACE:
+		_peace_reject = true
 
 
-func _house_spot(hall: Node) -> Vector2i:
-	var game: Node2D = get_tree().current_scene
-	for r in range(2, 8):
-		for dy in range(-r, r + 1):
-			for dx in range(-r, r + 1):
-				if maxi(absi(dx), absi(dy)) != r:
-					continue
-				var c: Vector2i = hall.cell + Vector2i(dx, dy)
-				if c.x < 1 or c.y < 1 or c.x >= D.MAP_W - 1 or c.y >= D.MAP_H - 1:
-					continue
-				if GameState.grid_at(c) != D.Tile.GRASS:
-					continue
-				if game.pathing.is_solid(c):
-					continue
-				return c
-	return Vector2i(-99, -99)
+func _on_over(winner: int, reason: int) -> void:
+	if _finished:
+		return
+	_finished = true
+	if winner == 2 and reason == D.Reason.DESTRUCTION:
+		print("SMOKE_PASS_CLIENT")
+		await get_tree().create_timer(0.5).timeout
+		get_tree().quit(0)
+	else:
+		printerr("SMOKE_FAIL_CLIENT yanlis sonuc w=%d r=%d" % [winner, reason])
+		get_tree().quit(1)
 
 
 func _fail() -> void:
-	if _done:
+	if _finished:
 		return
-	_done = true
+	_finished = true
 	printerr("SMOKE_FAIL_CLIENT timeout/assert")
 	get_tree().quit(1)

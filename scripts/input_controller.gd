@@ -142,12 +142,36 @@ func _command(wp: Vector2) -> void:
 			unit_ids.append(id)
 	if unit_ids.is_empty():
 		return
+	# dusman varligina tiklandiysa: savastaysak saldir, degilsek uyar
+	var enemy_id := _pick_enemy(wp)
+	if enemy_id != 0:
+		if GameState.war_state == D.War.WAR:
+			Net.send_attack(unit_ids, enemy_id)
+		else:
+			Bus.build_rejected.emit(D.Reject.PEACE)
+		return
 	var cell := Vector2i((wp / float(D.TILE)).floor())
 	var t := GameState.grid_at(cell)
 	if D.TILE_RES.has(t):
 		Net.send_gather(unit_ids, cell)
 	else:
 		Net.send_move(unit_ids, wp)
+
+
+func _pick_enemy(wp: Vector2) -> int:
+	var best := 0
+	var best_d := 10.0
+	for e in GameState.entities.values():
+		if e.owner_pid == GameState.my_pid:
+			continue
+		if e.def.has("speed_t"):
+			var d := wp.distance_to(e.position)
+			if d < best_d:
+				best_d = d
+				best = e.id
+		elif e.footprint_px().has_point(wp):
+			return e.id
+	return best
 
 
 func _draw() -> void:

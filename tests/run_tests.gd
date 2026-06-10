@@ -5,6 +5,16 @@ extends SceneTree
 
 
 func _initialize() -> void:
+	# once derleme taramasi: bir script parse edilemiyorsa GDScript hatalari
+	# sessizce yutup testleri sahte-PASS yapabiliyor; burada sert duvar var.
+	var compile_fails := 0
+	for dir in ["res://scripts", "res://tests", "res://tools"]:
+		compile_fails += _compile_sweep(dir)
+	if compile_fails > 0:
+		print("TESTS_FAILED compile_errors=", compile_fails)
+		quit(1)
+		return
+
 	var failures := 0
 	var files := DirAccess.get_files_at("res://tests")
 	files.sort()
@@ -36,3 +46,16 @@ func _initialize() -> void:
 	else:
 		print("TESTS_FAILED count=", failures)
 		quit(1)
+
+
+func _compile_sweep(dir: String) -> int:
+	var bad := 0
+	for f in DirAccess.get_files_at(dir):
+		if f.ends_with(".gd"):
+			var s: GDScript = load(dir + "/" + f)
+			if s == null or not s.can_instantiate():
+				print("COMPILE_FAIL ", dir, "/", f)
+				bad += 1
+	for d in DirAccess.get_directories_at(dir):
+		bad += _compile_sweep(dir + "/" + d)
+	return bad
