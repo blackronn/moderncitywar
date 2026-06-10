@@ -1,0 +1,181 @@
+extends Node
+## Oyunun veri omurgasi: tum denge sabitleri, birim/bina tanimlari, hasar matrisi.
+## Saf veri + statik yardimcilar; node bagimliligi YOK -- testler bu script'i
+## preload edip dogrudan kullanir. Sim dosyalari da autoload yerine
+## `const D := preload(...)` ile erisir.
+
+const VERSION := "0.1.0"
+
+# --- zaman / ag ---
+const TICK_RATE := 30
+const SNAPSHOT_EVERY_TICKS := 3      # 10 Hz
+const SNAP_MAX_ENTS := 110           # 10 B/entity -> paket ~1100 B < 1200 B (ENet MTU guvenligi)
+const WAR_COUNTDOWN_S := 30.0
+const INTERP_DELAY_S := 0.15         # istemci render gecikmesi (snapshot araliginin ~1.5 kati)
+
+# --- harita ---
+const MAP_W := 48
+const MAP_H := 48
+const TILE := 16
+const BUILD_RADIUS_TILES := 10       # yeni bina, mevcut kendi binandan en fazla bu kadar uzakta
+const SPAWN_CLEAR_RADIUS := 5        # baslangic bolgesi temiz cim yaricapi
+
+# --- zafer ---
+const METROPOLIS_POP := 40
+
+# --- ekonomi ---
+const START_RES := {"wood": 100, "stone": 50, "food": 50, "money": 50}
+const RES_KINDS: Array[String] = ["wood", "stone", "food", "money"]
+const FOREST_WOOD := 50.0            # bir orman tile'indaki toplam odun
+const STONE_AMOUNT := 200.0          # bir tas yatagindaki toplam tas
+const GATHER_RETARGET_T := 6         # kaynak tukenince bu yaricapta yenisi aranir (tile)
+const MAX_BUILDERS := 3              # ayni insaata en fazla isci
+const TRAIN_QUEUE_MAX := 5
+
+enum Tile { GRASS, WATER, BRIDGE, FOREST, STONE }
+enum Klass { INFANTRY, ARMOR, BUILDING }
+enum War { PEACE, COUNTDOWN, WAR }
+enum Ev { MATCH_STARTED, WAR_STATE, DEPLETED, BUILD_REJECTED, TRACER, TOAST_KEY }
+enum Reason { DESTRUCTION, METROPOLIS, OPPONENT_LEFT }
+enum Reject { NO_RES, BAD_SPOT, TOO_FAR, POP_FULL, BLOCKED, QUEUE_FULL, PEACE, INVALID }
+
+# snapshot bayraklari
+const FLAG_MOVING := 1
+const FLAG_ATTACKING := 2
+const FLAG_GATHERING := 4
+const FLAG_CONSTRUCTING := 8
+const FLAG_PRODUCING := 16
+
+# hangi tile hangi kaynagi verir + saniyelik toplama hizi
+const TILE_RES := {Tile.FOREST: "wood", Tile.STONE: "stone"}
+const GATHER_RATES := {Tile.FOREST: 1.0, Tile.STONE: 0.75}
+
+# --- birimler ---
+# speed_t: tile/sn, range_t/aggro_t: tile, cooldown_s: atislar arasi sn, train_s: uretim sn
+const UNITS := {
+	&"worker": {
+		"cost": {"food": 30}, "hp": 60, "dmg": 0, "range_t": 0.0, "cooldown_s": 0.0,
+		"speed_t": 2.5, "pop": 1, "klass": Klass.INFANTRY, "train_s": 8.0, "aggro_t": 0.0,
+	},
+	&"rifleman": {
+		"cost": {"food": 40, "money": 20}, "hp": 90, "dmg": 8, "range_t": 3.0, "cooldown_s": 1.0,
+		"speed_t": 2.2, "pop": 1, "klass": Klass.INFANTRY, "train_s": 8.0, "aggro_t": 5.0,
+	},
+	&"sniper": {
+		"cost": {"food": 50, "money": 50}, "hp": 55, "dmg": 22, "range_t": 6.0, "cooldown_s": 2.5,
+		"speed_t": 2.0, "pop": 1, "klass": Klass.INFANTRY, "train_s": 10.0, "aggro_t": 6.0,
+	},
+	&"rpg": {
+		"cost": {"food": 60, "money": 60}, "hp": 70, "dmg": 30, "range_t": 4.0, "cooldown_s": 3.0,
+		"speed_t": 1.8, "pop": 1, "klass": Klass.INFANTRY, "train_s": 12.0, "aggro_t": 5.0,
+	},
+	&"tank": {
+		"cost": {"money": 150, "stone": 80}, "hp": 450, "dmg": 24, "range_t": 4.0, "cooldown_s": 2.0,
+		"speed_t": 1.4, "pop": 3, "klass": Klass.ARMOR, "train_s": 15.0, "aggro_t": 5.0,
+	},
+}
+
+# --- binalar ---
+# size: tile cinsinden footprint, build_s: 1 isciyle insaat suresi, rate: pasif uretim/sn
+const BUILDINGS := {
+	&"city_hall": {
+		"cost": {}, "hp": 1500, "size": Vector2i(2, 2), "pop_cap": 5, "build_s": 0.0,
+		"trains": [&"worker"],
+	},
+	&"house": {
+		"cost": {"wood": 50}, "hp": 300, "size": Vector2i(1, 1), "pop_cap": 4, "build_s": 15.0,
+	},
+	&"greenhouse": {
+		"cost": {"wood": 60}, "hp": 250, "size": Vector2i(1, 1), "build_s": 15.0,
+		"rate": {"food": 0.5},
+	},
+	&"bank": {
+		"cost": {"wood": 80, "stone": 40}, "hp": 400, "size": Vector2i(1, 1), "build_s": 20.0,
+		"rate": {"money": 0.4},
+	},
+	&"barracks": {
+		"cost": {"wood": 100, "stone": 50}, "hp": 600, "size": Vector2i(2, 2), "build_s": 25.0,
+		"trains": [&"rifleman", &"sniper", &"rpg"],
+	},
+	&"factory": {
+		"cost": {"wood": 120, "stone": 100, "money": 100}, "hp": 800, "size": Vector2i(2, 2), "build_s": 35.0,
+		"trains": [&"tank"],
+	},
+	&"turret": {
+		"cost": {"stone": 60, "money": 40}, "hp": 500, "size": Vector2i(1, 1), "build_s": 20.0,
+		"dmg": 15, "range_t": 5.0, "cooldown_s": 1.2,
+	},
+}
+
+# hasar carpani: [saldiran klass][hedef klass]
+const DMG_MATRIX := {
+	Klass.INFANTRY: {Klass.INFANTRY: 1.0, Klass.ARMOR: 0.5, Klass.BUILDING: 0.5},
+	Klass.ARMOR: {Klass.INFANTRY: 1.5, Klass.ARMOR: 1.0, Klass.BUILDING: 1.0},
+	Klass.BUILDING: {Klass.INFANTRY: 1.0, Klass.ARMOR: 1.0, Klass.BUILDING: 0.0},
+}
+# matrisi ezen ozel kurallar (combat.gd uygular) -- counter ucgeninin keskin kenarlari
+const SNIPER_VS_INFANTRY := 2.0          # niscanci -> piyade sinifi
+const RPG_VS_ARMOR_BUILDING := 2.5       # rpg -> zirh/bina
+const RIFLE_VS_SNIPER_CLOSE := 2.0       # piyade -> niscanci, yakin mesafede
+const RIFLE_VS_SNIPER_RANGE_T := 3.0
+
+const DEFAULT_SEED := 1337               # offline onizleme/screenshot icin sabit seed
+
+
+static func unit(id: StringName) -> Dictionary:
+	return UNITS.get(id, {})
+
+
+static func building(id: StringName) -> Dictionary:
+	return BUILDINGS.get(id, {})
+
+
+static func is_unit(id: StringName) -> bool:
+	return UNITS.has(id)
+
+
+static func is_building(id: StringName) -> bool:
+	return BUILDINGS.has(id)
+
+
+static func defs_hash() -> int:
+	## Iki uctaki build'lerin ayni dengeyle calistigini dogrulamak icin.
+	return hash([VERSION, UNITS, BUILDINGS, DMG_MATRIX, START_RES])
+
+
+static func validate() -> Array:
+	## Tanim tablolarinin ic tutarliligi; testler bos dizi bekler.
+	var problems: Array = []
+	for id: StringName in UNITS:
+		var u: Dictionary = UNITS[id]
+		for field in ["cost", "hp", "dmg", "range_t", "cooldown_s", "speed_t", "pop", "klass", "train_s", "aggro_t"]:
+			if not u.has(field):
+				problems.append("unit %s: '%s' alani eksik" % [id, field])
+		if u.get("hp", 0) <= 0:
+			problems.append("unit %s: hp > 0 olmali" % id)
+		if u.get("speed_t", 0.0) <= 0.0:
+			problems.append("unit %s: speed_t > 0 olmali" % id)
+		for res_kind in u.get("cost", {}):
+			if res_kind not in RES_KINDS:
+				problems.append("unit %s: bilinmeyen kaynak '%s'" % [id, res_kind])
+	for id: StringName in BUILDINGS:
+		var b: Dictionary = BUILDINGS[id]
+		if b.get("hp", 0) <= 0:
+			problems.append("building %s: hp > 0 olmali" % id)
+		var size: Vector2i = b.get("size", Vector2i.ZERO)
+		if size.x < 1 or size.y < 1:
+			problems.append("building %s: size en az 1x1 olmali" % id)
+		for res_kind in b.get("cost", {}):
+			if res_kind not in RES_KINDS:
+				problems.append("building %s: bilinmeyen kaynak '%s'" % [id, res_kind])
+		for trained: StringName in b.get("trains", []):
+			if not UNITS.has(trained):
+				problems.append("building %s: tanimsiz birim uretir '%s'" % [id, trained])
+	for atk in [Klass.INFANTRY, Klass.ARMOR, Klass.BUILDING]:
+		for dfn in [Klass.INFANTRY, Klass.ARMOR, Klass.BUILDING]:
+			if not DMG_MATRIX.get(atk, {}).has(dfn):
+				problems.append("DMG_MATRIX[%d][%d] eksik" % [atk, dfn])
+	for res_kind in START_RES:
+		if res_kind not in RES_KINDS:
+			problems.append("START_RES: bilinmeyen kaynak '%s'" % res_kind)
+	return problems

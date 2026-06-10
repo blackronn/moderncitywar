@@ -1,0 +1,12 @@
+# Godot
+.godot/
+export/
+
+# indirilen ham arsivler (acilmis asset'ler commit'lenir)
+assets/downloads/
+
+# gecici ciktilar
+screenshots/
+*.zip
+*.log
+*.tmp

@@ -1,0 +1,36 @@
+; Engine configuration file.
+; Modern City War - 1v1 online sehir kurma / savas (Godot 4.6)
+
+config_version=5
+
+[application]
+
+config/name="Modern City War"
+run/main_scene="res://scenes/main_menu.tscn"
+config/features=PackedStringArray("4.6")
+config/icon="res://icon.svg"
+
+[autoload]
+
+Defs="*res://scripts/autoload/defs.gd"
+Tr="*res://scripts/autoload/tr_strings.gd"
+Bus="*res://scripts/autoload/bus.gd"
+Net="*res://scripts/autoload/net.gd"
+GameState="*res://scripts/autoload/game_state.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[physics]
+
+common/physics_ticks_per_second=30
+
+[rendering]
+
+textures/canvas_textures/default_texture_filter=0
+2d/snap/snap_2d_transforms_to_pixel=true
+environment/defaults/default_clear_color=Color(0.05, 0.09, 0.07, 1)
