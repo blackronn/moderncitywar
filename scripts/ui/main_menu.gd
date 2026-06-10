@@ -106,6 +106,7 @@ func _handle_cli() -> void:
 	var join_ip := ""
 	var smoke_host := false
 	var preview := false
+	var demo := false
 	for arg in OS.get_cmdline_user_args():
 		if arg == "--smoke-host":
 			smoke_host = true
@@ -113,6 +114,9 @@ func _handle_cli() -> void:
 			join_ip = arg.get_slice("=", 1) if arg.contains("=") else "127.0.0.1"
 		elif arg == "--preview":
 			preview = true
+		elif arg == "--demo":
+			preview = true
+			demo = true
 	if smoke_host:
 		var bot: Node = load("res://tools/smoke/host_bot.gd").new()
 		get_tree().root.add_child.call_deferred(bot)
@@ -130,4 +134,7 @@ func _handle_cli() -> void:
 	elif preview:
 		GameState.reset(D.DEFAULT_SEED)
 		GameState.my_pid = 1
+		if demo:
+			var dbot: Node = load("res://tools/smoke/demo_bot.gd").new()
+			get_tree().root.add_child.call_deferred(dbot)
 		get_tree().change_scene_to_file.call_deferred("res://scenes/game.tscn")

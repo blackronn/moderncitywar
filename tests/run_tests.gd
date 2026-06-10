@@ -12,8 +12,17 @@ func _initialize() -> void:
 		if not (f.begins_with("test_") and f.ends_with(".gd")):
 			continue
 		var script: GDScript = load("res://tests/" + f)
+		if script == null or not script.can_instantiate():
+			failures += 1
+			print("FAIL ", f, " (derlenemedi)")
+			continue
 		var inst: RefCounted = script.new()
-		var errs: Array = inst.run()
+		var result: Variant = inst.run()
+		if typeof(result) != TYPE_ARRAY:
+			failures += 1
+			print("FAIL ", f, " (run() Array dondurmedi - script hatasi?)")
+			continue
+		var errs: Array = result
 		if errs.is_empty():
 			print("PASS ", f)
 		else:

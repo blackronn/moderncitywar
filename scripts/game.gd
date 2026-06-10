@@ -19,7 +19,10 @@ var entities: Node2D
 var fx: Node2D
 var cam: Camera2D
 var hud: Control
+var ghost: Node2D
+var ghost_sprite: Sprite2D
 var pathing = null               # Pathing (RefCounted)
+var _ghost_def: StringName
 var _screenshot_path := ""
 
 
@@ -54,14 +57,25 @@ func _ready() -> void:
 	fx.name = "FX"
 	add_child(fx)
 
+	ghost = Node2D.new()
+	ghost.name = "PlacementGhost"
+	ghost.visible = false
+	add_child(ghost)
+	ghost_sprite = Sprite2D.new()
+	ghost.add_child(ghost_sprite)
+
 	cam = CameraScript.new()
 	cam.name = "Camera"
 	add_child(cam)
 	var my_spawn: Vector2i = GameState.spawns[GameState.my_pid - 1]
 	cam.position = Vector2(my_spawn) * D.TILE + Vector2(D.TILE, D.TILE)
 
-	var input_c: Node = InputScript.new()
+	pathing = Pathing.new()
+	pathing.setup(GameState.grid)
+
+	var input_c: Node2D = InputScript.new()
 	input_c.name = "InputController"
+	input_c.game = self
 	add_child(input_c)
 
 	var hud_layer := CanvasLayer.new()
@@ -69,10 +83,9 @@ func _ready() -> void:
 	add_child(hud_layer)
 	hud = HudScript.new()
 	hud.name = "HudRoot"
+	hud.game = self
+	hud.input_ctrl = input_c
 	hud_layer.add_child(hud)
-
-	pathing = Pathing.new()
-	pathing.setup(GameState.grid)
 
 	if Net.is_host():
 		var sim: Node = SimScript.new()
@@ -115,6 +128,11 @@ func spawn_entity_visual(id: int, def_id: StringName, owner_pid: int, pos: Vecto
 	node.setup(id, def_id, owner_pid)
 	node.position = pos
 	node.name = "E%d" % id
+	if node is BuildingScript:
+		# footprint sol-ustu pozisyondan turetilir; iki ucta ortak yol
+		var size: Vector2i = node.def["size"]
+		node.cell = Vector2i(((pos - Vector2(size) * D.TILE / 2.0) / D.TILE).round())
+		pathing.set_rect_solid(node.cell, size, true)
 	entities.add_child(node)
 	GameState.entities[id] = node
 	Bus.entity_spawned.emit(node)
@@ -125,9 +143,56 @@ func despawn_entity_visual(id: int, reason: int) -> void:
 	var node: Node = GameState.entities.get(id)
 	if node == null:
 		return
+	if node is BuildingScript:
+		pathing.set_rect_solid(node.cell, node.def["size"], false)
 	GameState.entities.erase(id)
 	Bus.entity_removed.emit(id, reason)
 	node.queue_free()
+
+
+# === insa hayaleti ===
+
+func show_ghost(def_id: StringName) -> void:
+	_ghost_def = def_id
+	ghost_sprite.texture = TileCatalog.building_texture(def_id, GameState.my_pid)
+	ghost_sprite.scale = Vector2(D.building(def_id)["size"] as Vector2i)
+	ghost.visible = true
+	update_ghost(get_global_mouse_position())
+
+
+func hide_ghost() -> void:
+	ghost.visible = false
+
+
+func update_ghost(wp: Vector2) -> void:
+	if not ghost.visible:
+		return
+	var bdef := D.building(_ghost_def)
+	var size: Vector2i = bdef["size"]
+	var tl: Vector2i = InputScript.ghost_tl(wp, size)
+	ghost.position = (Vector2(tl) + Vector2(size) / 2.0) * D.TILE
+	var ok := _ghost_valid(tl, bdef)
+	ghost.modulate = Color(0.45, 1.0, 0.45, 0.65) if ok else Color(1.0, 0.35, 0.35, 0.65)
+
+
+func _ghost_valid(tl: Vector2i, bdef: Dictionary) -> bool:
+	# istemci tarafi ON-kontrol (renk icin); asil dogrulama host'ta
+	if not GameState.can_afford(GameState.my_pid, bdef["cost"]):
+		return false
+	var size: Vector2i = bdef["size"]
+	for dy in size.y:
+		for dx in size.x:
+			var c := tl + Vector2i(dx, dy)
+			if GameState.grid_at(c) != D.Tile.GRASS:
+				return false
+			if pathing.is_solid(c):
+				return false
+	var rect := Rect2i(tl, size)
+	for e in GameState.entities.values():
+		if e.owner_pid == GameState.my_pid and e.def.has("size"):
+			if SimScript._rect_chebyshev(rect, Rect2i(e.cell, e.def["size"])) <= D.BUILD_RADIUS_TILES:
+				return true
+	return false
 
 
 func on_tile_depleted(cell: Vector2i) -> void:

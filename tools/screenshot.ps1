@@ -1,6 +1,6 @@
 # Kisa omurlu PENCERELI instance ile offline onizleme ekran goruntusu alir.
 # (--headless render uretemez; o yuzden pencere acilir ve kendiliginden kapanir.)
-param([string]$OutFile = 'screenshots\preview.png')
+param([string]$OutFile = 'screenshots\preview.png', [switch]$Demo)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $bin = $env:GODOT_BIN
@@ -11,6 +11,8 @@ $out = $OutFile
 if (-not [System.IO.Path]::IsPathRooted($out)) { $out = Join-Path $root $OutFile }
 New-Item -ItemType Directory -Force (Split-Path $out -Parent) | Out-Null
 
-& $bin --path $root -- --preview "--screenshot=$out"
+$flags = @('--preview')
+if ($Demo) { $flags = @('--demo') }
+& $bin --path $root -- @flags "--screenshot=$out"
 if ($LASTEXITCODE -ne 0) { Write-Host "Screenshot basarisiz (exit $LASTEXITCODE)"; exit 1 }
 Write-Host "Kaydedildi: $out"

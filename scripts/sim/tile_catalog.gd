@@ -29,17 +29,17 @@ const ROCK := Vector2i(5, 0)          # toprak/tas yigini (tas yatagi gorseli)
 const BUILDING_BAND := {1: 1, 2: 3}   # pid -> satir
 const VEHICLE_BAND := {1: 6, 2: 8}
 const BUILDING_COL := {
-	&"city_hall": 14,   # antenli komuta kulesi
-	&"house": 8,
-	&"greenhouse": 10,
-	&"bank": 9,
-	&"barracks": 13,
-	&"factory": 12,     # testere catili fabrika
-	&"turret": 15,
+	&"city_hall": 14,   # buyuk kule (en heybetli yapi)
+	&"house": 8,        # ikiz apartman
+	&"greenhouse": 9,   # genis cam cepheli bina
+	&"bank": 10,        # sutunlu klasik bina
+	&"barracks": 13,    # bayrak direkli askeri kule
+	&"factory": 11,     # testere catili fabrika
 }
+const TURRET_VEHICLE_COL := 11        # arac bandindaki sabit top yuvasi
 const SOLDIER_RIFLE_COL := 16
 const SOLDIER_HEAVY_COL := 17
-const TANK_COL := 11
+const TANK_COL := 8
 const PEASANT := Vector2i(8, 8)       # town: kapusonlu koylu (isci)
 
 
@@ -120,5 +120,7 @@ static func unit_texture(def_id: StringName, pid: int) -> Texture2D:
 
 
 static func building_texture(def_id: StringName, pid: int) -> Texture2D:
+	if def_id == &"turret":
+		return atlas(BATTLE, Vector2i(TURRET_VEHICLE_COL, VEHICLE_BAND[pid]))
 	var col: int = BUILDING_COL.get(def_id, 8)
 	return atlas(BATTLE, Vector2i(col, BUILDING_BAND[pid]))
