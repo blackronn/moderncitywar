@@ -13,6 +13,7 @@ var input_ctrl: Node = null
 
 var res_labels := {}
 var pop_label: Label
+var metro_label: Label
 var war_label: Label
 var war_btn: Button
 var toasts: VBoxContainer
@@ -48,6 +49,9 @@ func _ready() -> void:
 		bar.add_child(l)
 	pop_label = _mk_label(10)
 	bar.add_child(pop_label)
+	metro_label = _mk_label(8)
+	metro_label.modulate = Color(1, 1, 1, 0.55)
+	bar.add_child(metro_label)
 	var stretch := Control.new()
 	stretch.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.add_child(stretch)
@@ -169,6 +173,14 @@ func _on_res(pid: int) -> void:
 	pop_label.text = "%s %d/%d" % [
 		Tr.t(&"pop"), GameState.pop_used[GameState.my_pid], GameState.pop_cap[GameState.my_pid]
 	]
+	# metropol ilerlemesi: nufus + tamamlanmis farkli bina turu sayisi
+	var have := {}
+	for e in GameState.entities.values():
+		if e.owner_pid == GameState.my_pid and e.def.has("size") and e.is_complete():
+			have[e.def_id] = true
+	metro_label.text = Tr.t(&"metro_short") % [
+		GameState.pop_used[GameState.my_pid], D.METROPOLIS_POP, have.size(), D.BUILDINGS.size()
+	]
 
 
 func _on_war(state: int, _t_left: float) -> void:
@@ -214,7 +226,7 @@ func _refresh_panel() -> void:
 				has_worker = true
 
 	if units.size() > 1:
-		sel_label.text = "%d birim" % units.size()
+		sel_label.text = Tr.t(&"n_units") % units.size()
 	else:
 		sel_label.text = "%s  %d/%d" % [Tr.t(first.def_id), int(first.hp), int(first.max_hp)]
 

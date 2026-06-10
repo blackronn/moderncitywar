@@ -469,7 +469,20 @@ func _cell_of(e: Node) -> Vector2i:
 
 
 func _check_victory() -> void:
-	pass   # M2/M3
+	## Metropol Zaferi: nufus hedefi + her bina turunden >=1 tamamlanmis.
+	## (Yikim zaferi _kill aninda verilir.)
+	if not GameState.result.is_empty():
+		return
+	for pid in [1, 2]:
+		if GameState.pop_used[pid] < D.METROPOLIS_POP:
+			continue
+		var have := {}
+		for b in _buildings(pid):
+			if b.is_complete():
+				have[b.def_id] = true
+		if have.size() >= D.BUILDINGS.size():
+			Net.game_over(pid, D.Reason.METROPOLIS)
+			return
 
 
 func _broadcast_snapshot() -> void:

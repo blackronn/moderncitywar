@@ -95,16 +95,27 @@ func _ready() -> void:
 		add_child(sim)
 		Net.sim = sim
 
+	var show_end := false
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot="):
 			_screenshot_path = arg.get_slice("=", 1)
 			if _screenshot_path.is_relative_path():
 				_screenshot_path = ProjectSettings.globalize_path("res://") + _screenshot_path
+		elif arg == "--end":
+			show_end = true   # son ekran onizlemesi (screenshot icin)
 
 	Net.set_game_ready()
 
+	if show_end:
+		_preview_end_overlay()
 	if _screenshot_path != "":
 		_take_screenshot()
+
+
+func _preview_end_overlay() -> void:
+	for _i in 10:
+		await get_tree().process_frame
+	Net._apply_game_over(1, D.Reason.METROPOLIS)
 
 
 func _take_screenshot() -> void:
@@ -145,9 +156,30 @@ func despawn_entity_visual(id: int, reason: int) -> void:
 		return
 	if node is BuildingScript:
 		pathing.set_rect_solid(node.cell, node.def["size"], false)
+	if reason == 1:
+		_death_flash(node.position)
 	GameState.entities.erase(id)
 	Bus.entity_removed.emit(id, reason)
 	node.queue_free()
+
+
+func _death_flash(at: Vector2) -> void:
+	var fl := Node2D.new()
+	fl.position = at
+	var l1 := Line2D.new()
+	l1.points = PackedVector2Array([Vector2(-4, -4), Vector2(4, 4)])
+	l1.width = 2.0
+	l1.default_color = Color(1, 1, 1, 0.9)
+	var l2 := Line2D.new()
+	l2.points = PackedVector2Array([Vector2(-4, 4), Vector2(4, -4)])
+	l2.width = 2.0
+	l2.default_color = Color(1, 1, 1, 0.9)
+	fl.add_child(l1)
+	fl.add_child(l2)
+	fx.add_child(fl)
+	var tw := create_tween()
+	tw.tween_property(fl, "modulate:a", 0.0, 0.35)
+	tw.tween_callback(fl.queue_free)
 
 
 # === insa hayaleti ===

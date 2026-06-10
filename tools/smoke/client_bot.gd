@@ -1,18 +1,22 @@
 extends Node
-## M2 istemci botu (tum komutlar gercek rpc yolundan):
-## 1) baristayken saldiri dener -> PEACE reddi gelmeli
-## 2) savas ilan eder, geri sayimin WAR'a donmesini bekler
-## 3) orduyu dusman Belediyesi'ne surer
-## 4) iki ucta da winner=2 game_over gelince SMOKE_PASS_CLIENT
+## Istemci smoke botu. --scenario= ile senaryo secer:
+##   war (varsayilan): baris reddi -> savas ilani -> sayac -> saldiri ->
+##     (2, DESTRUCTION) PASS (tum komutlar gercek rpc yolundan)
+##   disconnect: mac basladiktan 2 sn sonra cikar (kacis testinin kendisi)
+##   metro: host'un metropol zaferinin istemciye yansimasini bekler
 
 const D := preload("res://scripts/autoload/defs.gd")
 const TIMEOUT_S := 110.0
 
+var scenario := "war"
 var _finished := false
 var _peace_reject := false
 
 
 func _ready() -> void:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--scenario="):
+			scenario = arg.get_slice("=", 1)
 	get_tree().create_timer(TIMEOUT_S).timeout.connect(_fail)
 	Bus.game_over.connect(_on_over)
 	Bus.build_rejected.connect(_on_reject)
@@ -23,7 +27,22 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	# host'un spawn ettigi orduyu bekle
+	match scenario:
+		"war":
+			_run_war()
+		"disconnect":
+			_run_disconnect()
+		"metro":
+			pass   # _on_over bekler
+
+
+func _run_disconnect() -> void:
+	await get_tree().create_timer(2.0).timeout
+	print("SMOKE_PASS_CLIENT")   # kacisin kendisi test eylemi
+	get_tree().quit(0)
+
+
+func _run_war() -> void:
 	while not _finished and _army().size() < 4:
 		await get_tree().create_timer(0.25).timeout
 	if _finished:
@@ -58,9 +77,8 @@ func _run() -> void:
 		return
 	print("BOT_CLIENT savas basladi")
 
-	# 3) saldiri
+	# 3) saldiri; sonucu _on_over dogrular
 	Net.send_attack(ids, hall.id)
-	# 4) sonucu _on_over bekler
 
 
 func _army() -> Array:
@@ -86,13 +104,21 @@ func _on_reject(reason: int) -> void:
 func _on_over(winner: int, reason: int) -> void:
 	if _finished:
 		return
+	var ok := false
+	match scenario:
+		"war":
+			ok = winner == 2 and reason == D.Reason.DESTRUCTION
+		"metro":
+			ok = winner == 1 and reason == D.Reason.METROPOLIS
+		"disconnect":
+			return   # kacis senaryosunda game_over beklenmez
 	_finished = true
-	if winner == 2 and reason == D.Reason.DESTRUCTION:
+	if ok:
 		print("SMOKE_PASS_CLIENT")
 		await get_tree().create_timer(0.5).timeout
 		get_tree().quit(0)
 	else:
-		printerr("SMOKE_FAIL_CLIENT yanlis sonuc w=%d r=%d" % [winner, reason])
+		printerr("SMOKE_FAIL_CLIENT yanlis sonuc w=%d r=%d senaryo=%s" % [winner, reason, scenario])
 		get_tree().quit(1)
 
 
@@ -100,5 +126,5 @@ func _fail() -> void:
 	if _finished:
 		return
 	_finished = true
-	printerr("SMOKE_FAIL_CLIENT timeout/assert")
+	printerr("SMOKE_FAIL_CLIENT timeout/assert (senaryo=%s)" % scenario)
 	get_tree().quit(1)

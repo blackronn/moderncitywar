@@ -80,6 +80,8 @@ const S := {
 	&"reason_opponent_left": "Rakip oyundan ayrıldı",
 	&"main_menu": "Ana Menü",
 	&"metropolis_goal": "Metropol: %d/%d nüfus + her binadan 1",
+	&"metro_short": "Metropol %d/%d | bina %d/%d",
+	&"n_units": "%d birim",
 }
 
 

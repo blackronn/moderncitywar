@@ -1,0 +1,85 @@
+# Modern City War
+
+> **"İki belediye başkanı, tek harita."** — 2 kişilik online şehir kurma + savaş oyunu.
+
+Simetrik bir pixel-art haritanın iki yakasında birer şehir. Ortada nehir, 2–3 köprü.
+Herkes **Belediye Binası + 1 işçiyle** başlar; işçiyle odun/taş toplar, ev/sera/banka
+kurar, nüfusunu büyütür. Oyun **barışta** başlar — saldırmak imkânsızdır. Ta ki biri
+**"Savaş İlan Et"** deyip 30 saniyelik sireni başlatana kadar.
+
+**İki zafer yolu:**
+
+1. **Yıkım Zaferi** — rakibin Belediye Binası'nı yık.
+2. **Metropol Zaferi** — 40 nüfus + her bina türünden en az 1 (savaşmadan kazanmak mümkün).
+
+| | |
+|---|---|
+| Motor | Godot 4.6.3 (GDScript) |
+| Ağ | ENet host/join, host-otoriter sim (30 Hz) + 10 Hz snapshot |
+| Grafik | Kenney Tiny Town + Tiny Battle (CC0) + üretilmiş spritelar |
+| Font | Public Pixel (CC0, Türkçe karakter desteği tam) |
+
+## Kurulum
+
+```powershell
+git clone https://github.com/blackronn/moderncitywar.git
+cd moderncitywar
+powershell -ExecutionPolicy Bypass -File tools\setup_godot.ps1   # portable Godot 4.6.3 indirir
+powershell -ExecutionPolicy Bypass -File tools\godot.ps1 --path . --import   # ilk import
+```
+
+Asset'ler repoda hazır (CC0). Yeniden indirmek istersen: `tools\get_assets.ps1`.
+
+## Oynama
+
+Oyunu aç (`tools\godot.ps1 --path .`) — bir oyuncu **Oyun Kur**, diğeri **Oyuna Katıl** + host'un IP'si.
+
+- **Aynı ağda (LAN/yurt/ev):** doğrudan çalışır; host'un lobide görünen IP'sine bağlan.
+- **İnternet üzerinden (önerilen): [Tailscale](https://tailscale.com)** — iki tarafa da kur,
+  aynı tailnet'e gir, host'un Tailscale IP'sine (100.x.x.x) bağlan. Port açmak gerekmez.
+- **Port yönlendirme:** host, modeminden **8910/UDP**'yi kendi makinesine yönlendirir;
+  istemci host'un dış IP'sine bağlanır. İlk kurmada Windows Güvenlik Duvarı izni ver
+  (veya: `netsh advfirewall firewall add rule name="MCW" dir=in action=allow protocol=UDP localport=8910`).
+
+### Kontroller
+
+| Girdi | İşlev |
+|---|---|
+| Sol tık / sürükle | Seç / kutu seçim |
+| Sağ tık | Bağlamsal: yürü · kaynağa gönder · (savaştayken) saldır |
+| İnşa menüsü | İşçi seçiliyken alt panelde; yeşil/kırmızı hayaletle yerleştir |
+| WASD / ok / orta tuş | Kamera |
+| Tekerlek | Zoom (tam sayı adımlar) |
+| ESC | Seçimi / yerleştirmeyi iptal et |
+
+### Birimler ve counter üçgeni
+
+İşçi (toplar/inşa eder) · **Piyade** (ucuz) · **Nişancı** (uzun menzil, piyadeye ×2) ·
+**RPG'ci** (zırh/binaya ×2.5) · **Tank** (piyadeye ×1.5, etli). Piyade yaklaşırsa
+nişancıyı döver; RPG tankı eritir; tank piyadeyi biçer. Taret şehrini savunur.
+
+## Geliştirme
+
+```powershell
+tools\godot.ps1 --headless --path . --script res://tests/run_tests.gd   # birim testleri (+ derleme taraması)
+tools\smoke\run_smoke.ps1                       # e2e: tam savas senaryosu (2 headless instance, loopback)
+tools\smoke\run_smoke.ps1 -Scenario disconnect  # kopma -> kalan oyuncuya zafer
+tools\smoke\run_smoke.ps1 -Scenario metro       # Metropol Zaferi yolu
+tools\screenshot.ps1 -Mode demo -OutFile screenshots\demo.png   # gorsel kontrol (menu|preview|demo|end)
+tools\godot.ps1 --path . -- --preview            # agsiz tek pencere onizleme
+```
+
+Mimari kısa notlar: tüm `@rpc`'ler `scripts/autoload/net.gd`'de yaşar (entity'ler int id ile anılır);
+denge sayılarının tamamı `scripts/autoload/defs.gd`'de; harita iki uçta aynı seed'den deterministik
+üretilir ve `map_hash` ile el sıkışmada doğrulanır; sim yalnızca host'ta koşar, istemci 10 Hz
+snapshot'ı ~150 ms geriden interpolasyonla çizer.
+
+## Yol haritası (MVP sonrası)
+
+Duvar + kapı · ateşkes teklifi · savaş sisi · minimap · sesler · dron keşfi ·
+barışta kaynak ticareti · VPS'te dedicated headless server / relay · matchmaking · replay.
+
+## Lisanslar
+
+Kod: MIT. Görseller: [Kenney](https://kenney.nl) Tiny Town & Tiny Battle (CC0).
+Font: [Public Pixel](https://ggbot.itch.io/public-pixel-font) (CC0). Üretilmiş spritelar: CC0.

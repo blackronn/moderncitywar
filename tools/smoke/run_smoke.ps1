@@ -1,7 +1,7 @@
 # Uctan uca duman testi: 127.0.0.1'de host + istemci iki HEADLESS instance.
 # Loopback oldugu icin Windows Firewall tetiklenmez. Basari kosulu: iki
 # instance da exit 0 + loglarda SMOKE_PASS_HOST / SMOKE_PASS_CLIENT.
-param([int]$TimeoutSec = 120)
+param([int]$TimeoutSec = 120, [string]$Scenario = 'war')
 $ErrorActionPreference = 'Stop'
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $bin = $env:GODOT_BIN
@@ -16,15 +16,15 @@ foreach ($f in @($hostLog, $clientLog, "$hostLog.err", "$clientLog.err")) {
     if (Test-Path $f) { Remove-Item $f -Force }
 }
 
-Write-Host 'Host instance basliyor...'
+Write-Host "Host instance basliyor (senaryo: $Scenario)..."
 $hostP = Start-Process -FilePath $bin `
-    -ArgumentList @('--headless', '--path', $root, '--', '--smoke-host', '--speed=8') `
+    -ArgumentList @('--headless', '--path', $root, '--', '--smoke-host', '--speed=8', "--scenario=$Scenario") `
     -RedirectStandardOutput $hostLog -RedirectStandardError "$hostLog.err" -PassThru -NoNewWindow
 $null = $hostP.Handle   # ExitCode'un okunabilmesi icin handle'i cikistan ONCE yakala (PS 5.1)
 Start-Sleep -Seconds 3
 Write-Host 'Istemci instance basliyor...'
 $clientP = Start-Process -FilePath $bin `
-    -ArgumentList @('--headless', '--path', $root, '--', '--smoke-join=127.0.0.1', '--speed=8') `
+    -ArgumentList @('--headless', '--path', $root, '--', '--smoke-join=127.0.0.1', '--speed=8', "--scenario=$Scenario") `
     -RedirectStandardOutput $clientLog -RedirectStandardError "$clientLog.err" -PassThru -NoNewWindow
 $null = $clientP.Handle
 

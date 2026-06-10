@@ -102,11 +102,23 @@ func _on_quit() -> void:
 	get_tree().quit()
 
 
+func _menu_screenshot(path: String) -> void:
+	if path.is_relative_path():
+		path = ProjectSettings.globalize_path("res://") + path
+	for _i in 20:
+		await get_tree().process_frame
+	var img := get_viewport().get_texture().get_image()
+	var err := img.save_png(path)
+	print("SCREENSHOT_SAVED " if err == OK else "SCREENSHOT_FAILED ", path)
+	get_tree().quit(0 if err == OK else 1)
+
+
 func _handle_cli() -> void:
 	var join_ip := ""
 	var smoke_host := false
 	var preview := false
 	var demo := false
+	var menu_shot := ""
 	for arg in OS.get_cmdline_user_args():
 		if arg == "--smoke-host":
 			smoke_host = true
@@ -117,6 +129,8 @@ func _handle_cli() -> void:
 		elif arg == "--demo":
 			preview = true
 			demo = true
+		elif arg.begins_with("--screenshot="):
+			menu_shot = arg.get_slice("=", 1)
 	if smoke_host:
 		var bot: Node = load("res://tools/smoke/host_bot.gd").new()
 		get_tree().root.add_child.call_deferred(bot)
@@ -138,3 +152,5 @@ func _handle_cli() -> void:
 			var dbot: Node = load("res://tools/smoke/demo_bot.gd").new()
 			get_tree().root.add_child.call_deferred(dbot)
 		get_tree().change_scene_to_file.call_deferred("res://scenes/game.tscn")
+	elif menu_shot != "":
+		_menu_screenshot(menu_shot)
