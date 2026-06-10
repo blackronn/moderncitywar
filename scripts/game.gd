@@ -5,6 +5,8 @@ extends Node2D
 const D := preload("res://scripts/autoload/defs.gd")
 const MapGen := preload("res://scripts/sim/map_gen.gd")
 const TileCatalog := preload("res://scripts/sim/tile_catalog.gd")
+const Bible := preload("res://scripts/sim/bible.gd")
+const FxScript := preload("res://scripts/fx_sprite.gd")
 const Pathing := preload("res://scripts/sim/pathing.gd")
 const SimScript := preload("res://scripts/sim/sim.gd")
 const CameraScript := preload("res://scripts/camera.gd")
@@ -158,37 +160,56 @@ func despawn_entity_visual(id: int, reason: int) -> void:
 	if node is BuildingScript:
 		pathing.set_rect_solid(node.cell, node.def["size"], false)
 	if reason == 1:
-		_death_flash(node.position)
+		_death_visual(node)
 	GameState.entities.erase(id)
 	Bus.entity_removed.emit(id, reason)
 	node.queue_free()
 
 
-func _death_flash(at: Vector2) -> void:
-	var fl := Node2D.new()
-	fl.position = at
-	var l1 := Line2D.new()
-	l1.points = PackedVector2Array([Vector2(-4, -4), Vector2(4, 4)])
-	l1.width = 2.0
-	l1.default_color = Color(1, 1, 1, 0.9)
-	var l2 := Line2D.new()
-	l2.points = PackedVector2Array([Vector2(-4, 4), Vector2(4, -4)])
-	l2.width = 2.0
-	l2.default_color = Color(1, 1, 1, 0.9)
-	fl.add_child(l1)
-	fl.add_child(l2)
-	fx.add_child(fl)
-	var tw := create_tween()
-	tw.tween_property(fl, "modulate:a", 0.0, 0.35)
-	tw.tween_callback(fl.queue_free)
+func _death_visual(node: Node) -> void:
+	## Bible olum sahnesi: birim kendi olum animasyonunu oynar (devril+sol),
+	## bina patlama efektiyle gider.
+	if node is UnitScript:
+		var table: Array = Bible.UNIT_ANIMS[node.def_id]
+		var row := Bible.unit_anim_row(node.def_id, &"death")
+		var corpse: Sprite2D = FxScript.new()
+		corpse.texture = load(Bible.unit_sheet(node.def_id, node.owner_pid))
+		corpse.hframes = Bible.UNIT_COLS
+		corpse.vframes = table.size()
+		corpse.row = row
+		corpse.frames = table[row][1]
+		corpse.frame_dt = table[row][2]
+		corpse.one_shot = true
+		corpse.offset = Vector2(0, 1)
+		corpse.flip_h = node.sprite.flip_h
+		corpse.position = node.position
+		fx.add_child(corpse)
+	else:
+		var size: Vector2i = node.def["size"]
+		spawn_fx(&"explosion", node.position, 1.2 * size.x)
+
+
+func spawn_fx(fx_id: StringName, at: Vector2, fx_scale := 1.0, ttl := 0.0) -> void:
+	var meta: Array = Bible.FX[fx_id]
+	var s: Sprite2D = FxScript.new()
+	s.texture = load(Bible.fx_sheet(fx_id))
+	s.hframes = meta[0]
+	s.vframes = 1
+	s.frames = meta[0]
+	s.frame_dt = meta[1]
+	s.one_shot = not meta[2]
+	s.ttl = ttl
+	s.position = at
+	s.scale = Vector2(fx_scale, fx_scale)
+	fx.add_child(s)
 
 
 # === insa hayaleti ===
 
 func show_ghost(def_id: StringName) -> void:
 	_ghost_def = def_id
-	ghost_sprite.texture = TileCatalog.building_texture(def_id, GameState.my_pid)
-	ghost_sprite.scale = Vector2(D.building(def_id)["size"] as Vector2i)
+	ghost_sprite.texture = TileCatalog.building_preview(def_id, GameState.my_pid)
+	ghost_sprite.scale = Vector2.ONE   # bible sheet'leri footprint olcusunde pisirilir
 	ghost.visible = true
 	update_ghost(get_global_mouse_position())
 
@@ -232,11 +253,41 @@ func on_tile_depleted(cell: Vector2i) -> void:
 	features.erase_cell(cell)
 
 
+static var _tracer_tex: Texture2D = null
+
+
 func show_tracer(from: Vector2, to: Vector2, kind := 0) -> void:
-	var line := Line2D.new()
-	line.points = PackedVector2Array([from, to])
-	line.width = 1.0
-	# 0 = mermi (sari), 1 = iyilestirme isini (yesil)
-	line.default_color = Color(0.45, 1.0, 0.55, 0.9) if kind == 1 else Color(1.0, 0.95, 0.6, 0.9)
-	fx.add_child(line)
-	get_tree().create_timer(0.18 if kind == 1 else 0.1).timeout.connect(line.queue_free)
+	if kind == 1:
+		# iyilestirme isini: yesil cizgi (bible'da heal fx yok; mevcut stil)
+		var line := Line2D.new()
+		line.points = PackedVector2Array([from, to])
+		line.width = 1.0
+		line.default_color = Color(0.45, 1.0, 0.55, 0.9)
+		fx.add_child(line)
+		get_tree().create_timer(0.18).timeout.connect(line.queue_free)
+		return
+	# bible mermi izi: namlu parlama + soluk iz + ucan parlak mermi basi
+	spawn_fx(&"muzzle", from)
+	var trail := Line2D.new()
+	trail.points = PackedVector2Array([from, to])
+	trail.width = 1.0
+	trail.default_color = Color(1.0, 0.823, 0.47, 0.35)
+	fx.add_child(trail)
+	var tw_trail := create_tween()
+	tw_trail.tween_property(trail, "modulate:a", 0.0, 0.18)
+	tw_trail.tween_callback(trail.queue_free)
+	if _tracer_tex == null:
+		var img := Image.create(4, 1, false, Image.FORMAT_RGBA8)
+		img.set_pixel(0, 0, Color("#ffd070"))
+		img.set_pixel(1, 0, Color("#ffd070"))
+		img.set_pixel(2, 0, Color("#fff3b0"))
+		img.set_pixel(3, 0, Color("#fff3b0"))
+		_tracer_tex = ImageTexture.create_from_image(img)
+	var head := Sprite2D.new()
+	head.texture = _tracer_tex
+	head.position = from
+	head.rotation = from.angle_to_point(to)
+	fx.add_child(head)
+	var tw := create_tween()
+	tw.tween_property(head, "position", to, clampf(from.distance_to(to) / 420.0, 0.05, 0.18))
+	tw.tween_callback(head.queue_free)

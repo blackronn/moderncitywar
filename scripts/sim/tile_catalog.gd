@@ -1,68 +1,48 @@
 extends RefCounted
-## Kenney sheet'lerinden TileSet'i KODLA kurar; entity sprite bolgelerini de
-## bilir. Tum atlas koordinatlari tek yerde: gorsel degisiklik = bu dosya.
-## Bant mantigi (tiny-battle): bina satirlari gri=0 yesil=1 mavi=2 kirmizi=3
-## turuncu=4; arac/asker satirlari gri=5 yesil=6 mavi=7 kirmizi=8 turuncu=9.
-## P1 = yesil bant, P2 = kirmizi bant -> takim rengi sheet'ten bedava gelir.
+## Asset Bibliasi zemin seti: ANIMASYONLU TileSet'i kodla kurar (su akar,
+## cicekler/agaclar salinir, kaya parlar) + insa hayaleti icin bina onizlemesi.
+## Sheet'ler tools/gen_bible.gd tarafindan uretilir.
 
 const D := preload("res://scripts/autoload/defs.gd")
+const Bible := preload("res://scripts/sim/bible.gd")
 
-const TOWN := "res://assets/kenney/tiny-town/tilemap_packed.png"
-const BATTLE := "res://assets/kenney/tiny-battle/tilemap_packed.png"
-
-const SRC_TOWN := 0
-const SRC_BATTLE := 1
-
-# --- zemin (town) ---
-const GRASS_PLAIN := Vector2i(0, 0)
-const GRASS_DOTS := Vector2i(1, 0)    # yesil filizli cim
-const GRASS_FLOWERS := Vector2i(2, 0) # turuncu cicekli cim (nadir)
-const TREE_A := Vector2i(4, 1)        # yesil govdeli yuvarlak agac (tam, tek tile)
-const TREE_B := Vector2i(4, 0)        # yesil selvi (tam, tek tile)
-
-# --- su & kopru & tas (battle) ---
-const WATER := Vector2i(0, 4)         # duz derin su
-const BRIDGE := Vector2i(4, 7)        # korkuluklu YATAY kopru (oldugu gibi kullanilir)
-const ROCK := Vector2i(5, 0)          # toprak/tas yigini (tas yatagi gorseli)
-
-# --- entity bantlari (battle) ---
-const BUILDING_BAND := {1: 1, 2: 3}   # pid -> satir
-const VEHICLE_BAND := {1: 6, 2: 8}
-const BUILDING_COL := {
-	&"city_hall": 14,   # buyuk kule (en heybetli yapi)
-	&"house": 8,        # ikiz apartman
-	&"greenhouse": 9,   # genis cam cepheli bina
-	&"bank": 10,        # sutunlu klasik bina
-	&"lumber_camp": 15, # arac kapili depo (kereste deposu)
-	&"quarry": 12,      # vincli/kuleli yapi (tas ocagi)
-	&"barracks": 13,    # bayrak direkli askeri kule
-	&"factory": 11,     # testere catili fabrika
+# kind -> atlas source id
+const SRC_IDS := {
+	D.Tile.GRASS: 0,
+	D.Tile.WATER: 1,
+	D.Tile.BRIDGE: 2,
+	D.Tile.FOREST: 3,
+	D.Tile.STONE: 4,
 }
-const TURRET_VEHICLE_COL := 11        # arac bandindaki sabit top yuvasi
-const SOLDIER_RIFLE_COL := 16
-const SOLDIER_HEAVY_COL := 17
-const TANK_COL := 8
-const PEASANT := Vector2i(8, 8)       # town: kapusonlu koylu (isci)
+const KIND_NAMES := {
+	D.Tile.GRASS: &"grass",
+	D.Tile.WATER: &"water",
+	D.Tile.BRIDGE: &"bridge",
+	D.Tile.FOREST: &"forest",
+	D.Tile.STONE: &"stone",
+}
 
 
 static func build_tileset() -> TileSet:
 	var ts := TileSet.new()
-	var town_src := _make_source(TOWN, [GRASS_PLAIN, GRASS_DOTS, GRASS_FLOWERS, TREE_A, TREE_B])
-	var battle_src := _make_source(BATTLE, [WATER, BRIDGE, ROCK])
 	ts.tile_size = Vector2i(D.TILE, D.TILE)
-	ts.add_source(town_src, SRC_TOWN)
-	ts.add_source(battle_src, SRC_BATTLE)
+	for kind: int in SRC_IDS:
+		var kname: StringName = KIND_NAMES[kind]
+		var meta: Array = Bible.TILE_ANIMS[kname]
+		var variants: int = meta[0]
+		var frames: int = meta[1]
+		var dt: float = meta[2]
+		var src := TileSetAtlasSource.new()
+		src.texture = load(Bible.tile_sheet(kname))
+		src.texture_region_size = Vector2i(D.TILE, D.TILE)
+		for v in variants:
+			var coords := Vector2i(0, v)
+			src.create_tile(coords)
+			src.set_tile_animation_frames_count(coords, frames)
+			for f in frames:
+				src.set_tile_animation_frame_duration(coords, f, dt)
+		ts.add_source(src, SRC_IDS[kind])
 	return ts
-
-
-static func _make_source(sheet: String, coords: Array) -> TileSetAtlasSource:
-	var src := TileSetAtlasSource.new()
-	src.texture = load(sheet)
-	src.texture_region_size = Vector2i(D.TILE, D.TILE)
-	for c: Vector2i in coords:
-		if not src.has_tile(c):
-			src.create_tile(c)
-	return src
 
 
 static func paint(terrain: TileMapLayer, features: TileMapLayer, grid: PackedInt32Array) -> void:
@@ -74,60 +54,30 @@ static func paint(terrain: TileMapLayer, features: TileMapLayer, grid: PackedInt
 			var t := grid[y * D.MAP_W + x]
 			match t:
 				D.Tile.WATER:
-					terrain.set_cell(cell, SRC_BATTLE, WATER)
+					terrain.set_cell(cell, SRC_IDS[D.Tile.WATER], Vector2i(0, _variant(cell, &"water")))
 				D.Tile.BRIDGE:
-					terrain.set_cell(cell, SRC_BATTLE, BRIDGE)
+					terrain.set_cell(cell, SRC_IDS[D.Tile.BRIDGE], Vector2i(0, _variant(cell, &"bridge")))
 				_:
-					terrain.set_cell(cell, SRC_TOWN, _grass_variant(cell))
+					terrain.set_cell(cell, SRC_IDS[D.Tile.GRASS], Vector2i(0, _variant(cell, &"grass")))
 			if t == D.Tile.FOREST:
-				features.set_cell(cell, SRC_TOWN, TREE_A if (x * 7 + y * 13) % 3 != 0 else TREE_B)
+				features.set_cell(cell, SRC_IDS[D.Tile.FOREST], Vector2i(0, _variant(cell, &"forest")))
 			elif t == D.Tile.STONE:
-				features.set_cell(cell, SRC_BATTLE, ROCK)
+				features.set_cell(cell, SRC_IDS[D.Tile.STONE], Vector2i(0, _variant(cell, &"stone")))
 
 
-static func _grass_variant(cell: Vector2i) -> Vector2i:
-	# deterministik cesitlilik (rng yok: iki ucta ayni gorunum);
-	# lineer formul diyagonal cizgi desenine donusuyor, o yuzden tam sayi hash
+static func _variant(cell: Vector2i, kname: StringName) -> int:
+	# deterministik varyant secimi (iki ucta ayni gorunum; rng yok)
+	var variants: int = Bible.TILE_ANIMS[kname][0]
 	var n := cell.x * 374761393 + cell.y * 668265263
 	n = (n ^ (n >> 13)) * 1274126177
 	n = (n ^ (n >> 16)) & 0x7fffffff
-	var v := n % 25
-	if v == 0:
-		return GRASS_FLOWERS
-	if v <= 5:
-		return GRASS_DOTS
-	return GRASS_PLAIN
+	return n % variants
 
 
-# --- entity dokulari ---
-
-static func atlas(sheet: String, coords: Vector2i, size := Vector2i(1, 1)) -> AtlasTexture:
+static func building_preview(def_id: StringName, pid: int) -> Texture2D:
+	## Insa hayaleti: bina sheet'inin ilk karesi.
 	var at := AtlasTexture.new()
-	at.atlas = load(sheet)
-	at.region = Rect2(coords.x * D.TILE, coords.y * D.TILE, size.x * D.TILE, size.y * D.TILE)
+	at.atlas = load(Bible.building_sheet(def_id, pid))
+	var fpx := Bible.building_frame_px(def_id)
+	at.region = Rect2(0, 0, fpx, fpx)
 	return at
-
-
-static func unit_texture(def_id: StringName, pid: int) -> Texture2D:
-	match def_id:
-		&"worker":
-			return atlas(TOWN, PEASANT)
-		&"rifleman":
-			return atlas(BATTLE, Vector2i(SOLDIER_RIFLE_COL, VEHICLE_BAND[pid]))
-		&"sniper":
-			# oyuna ozel uretilmis sprite (tools/gen_sprites.gd)
-			return load("res://assets/generated/sniper_p%d.png" % pid) as Texture2D
-		&"healer":
-			return load("res://assets/generated/medic_p%d.png" % pid) as Texture2D
-		&"rpg":
-			return atlas(BATTLE, Vector2i(SOLDIER_HEAVY_COL, VEHICLE_BAND[pid]))
-		&"tank":
-			return atlas(BATTLE, Vector2i(TANK_COL, VEHICLE_BAND[pid]))
-	return atlas(TOWN, PEASANT)
-
-
-static func building_texture(def_id: StringName, pid: int) -> Texture2D:
-	if def_id == &"turret":
-		return atlas(BATTLE, Vector2i(TURRET_VEHICLE_COL, VEHICLE_BAND[pid]))
-	var col: int = BUILDING_COL.get(def_id, 8)
-	return atlas(BATTLE, Vector2i(col, BUILDING_BAND[pid]))

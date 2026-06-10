@@ -16,7 +16,7 @@ toplar, şehir kurar, nüfusunu büyütür — ve **istediği an saldırır** (i
 |---|---|
 | Motor | Godot 4.6.3 (GDScript) |
 | Ağ | ENet host/join, host-otoriter sim (30 Hz) + 10 Hz snapshot |
-| Grafik | Kenney Tiny Town + Tiny Battle (CC0) + üretilmiş spritelar |
+| Grafik | Oyuna özel **animasyonlu Asset Bibliası** (WorldBox tarzı, Mavi P1 / Kırmızı P2) — kaynak: [docs/design](docs/design), üreteç: `tools/gen_bible.gd` |
 | Font | Public Pixel (CC0, Türkçe karakter desteği tam) |
 
 ## Kurulum
@@ -88,5 +88,7 @@ barışta kaynak ticareti · VPS'te dedicated headless server / relay · matchma
 
 ## Lisanslar
 
-Kod: MIT. Görseller: [Kenney](https://kenney.nl) Tiny Town & Tiny Battle (CC0).
-Font: [Public Pixel](https://ggbot.itch.io/public-pixel-font) (CC0). Üretilmiş spritelar: CC0.
+Kod: MIT. Görseller: oyuna özel Asset Bibliası spriteları (CC0 ruhuna uygun; tasarım
+claude.ai/design ile yapıldı, üretici kod `tools/gen_bible.gd`). Repoda duran
+[Kenney](https://kenney.nl) paketleri (CC0) artık oyunda kullanılmıyor, referans olarak duruyor.
+Font: [Public Pixel](https://ggbot.itch.io/public-pixel-font) (CC0).

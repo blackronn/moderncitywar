@@ -4,7 +4,7 @@ extends Node2D
 ## istemci ilerlemeyi snapshot progress baytindan okur.
 
 const D := preload("res://scripts/autoload/defs.gd")
-const TileCatalog := preload("res://scripts/sim/tile_catalog.gd")
+const Bible := preload("res://scripts/sim/bible.gd")
 
 var id := 0
 var def_id: StringName
@@ -25,6 +25,11 @@ var cooldown := 0.0                  # taret atis bekleme
 # --- istemci gosterimi ---
 var _net_progress := 1.0
 
+# --- animasyon ---
+var _anim_frames := 1
+var _anim_dt := 0.2
+var _anim_t := 0.0
+
 var sprite: Sprite2D
 var selected := false:
 	set(v):
@@ -39,12 +44,22 @@ func setup(p_id: int, p_def_id: StringName, p_owner: int) -> void:
 	def = D.building(def_id)
 	hp = def["hp"]
 	max_hp = def["hp"]
+	# Asset Bibliasi: ambient animasyonlu sheet (bayrak/duman/parilti/taret)
+	var meta: Array = Bible.BUILDING_ANIMS[def_id]
+	_anim_frames = meta[0]
+	_anim_dt = meta[1]
 	sprite = Sprite2D.new()
-	sprite.texture = TileCatalog.building_texture(def_id, owner_pid)
-	var size: Vector2i = def["size"]
-	sprite.scale = Vector2(size)     # 1x1 -> 16px, 2x2 -> 32px
+	sprite.texture = load(Bible.building_sheet(def_id, owner_pid))
+	sprite.hframes = _anim_frames
+	sprite.vframes = 1
 	add_child(sprite)
+	_anim_t = randf() * _anim_frames * _anim_dt   # binalar senkron oynamasin
 	_update_construction_visual()
+
+
+func _process(dt: float) -> void:
+	_anim_t += dt
+	sprite.frame = int(_anim_t / _anim_dt) % _anim_frames
 
 
 func start_construction() -> void:

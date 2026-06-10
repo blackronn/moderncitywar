@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face { font-family: 'PublicPixel'; src: url('assets/fonts/PublicPixel.ttf') format('truetype'); font-display: swap; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+canvas[data-sprite] { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+</style>
+</helmet>
+<div ref="{{ setRoot }}" style="min-height:100vh; background:#11141b; background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.04) 1px, transparent 0); background-size: 22px 22px; color:#e9edf4; font-family: 'DM Sans', system-ui, sans-serif; padding:0 0 80px;">
+
+  <header style="padding:48px 56px 36px; border-bottom:1px solid #232836; display:flex; align-items:flex-end; justify-content:space-between; gap:32px; flex-wrap:wrap; position:sticky; top:0; background:rgba(17,20,27,0.92); backdrop-filter:blur(8px); z-index:20;">
+    <div>
+      <div style="display:flex; align-items:center; gap:14px; margin-bottom:14px;">
+        <div style="width:30px; height:30px; background:#2f6fd6; box-shadow: 6px 0 0 #d83b2f; image-rendering:pixelated;"></div>
+        <span style="font-family:'PublicPixel'; font-size:11px; letter-spacing:1px; color:#8b94a7;">MODERN CITY WAR</span>
+      </div>
+      <h1 style="font-family:'PublicPixel'; font-size:30px; line-height:1.35; margin:0; color:#fff; text-shadow:3px 3px 0 #000;">ASSET BİBLİASI</h1>
+      <p style="margin:16px 0 0; max-width:560px; color:#9aa3b5; font-size:15px; line-height:1.6;">Oyuna özel, sıfırdan tasarlanmış WorldBox tarzı minik karakterler, binalar ve zemin döşemeleri — hepsi canvas'ta canlı animasyonlu. Pikseller gerçek; her şey 16×16 ızgarada çalışır.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:12px; align-items:flex-end;">
+      <span style="font-family:'PublicPixel'; font-size:8px; color:#6b7488; letter-spacing:1px;">TAKIM RENGİ</span>
+      <div style="display:flex; gap:8px;">
+        <button onClick="{{ pickP1 }}" style="{{ p1BtnStyle }}">MAVİ · P1</button>
+        <button onClick="{{ pickP2 }}" style="{{ p2BtnStyle }}">KIRMIZI · P2</button>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:4px;">
+        <button onClick="{{ toggleZoom }}" style="{{ zoomBtnStyle }}">{{ zoomLabel }}</button>
+        <button onClick="{{ togglePause }}" style="{{ pauseBtnStyle }}">{{ pauseLabel }}</button>
+      </div>
+    </div>
+  </header>
+
+  <main style="max-width:1240px; margin:0 auto; padding:0 40px;">
+
+    <section style="padding:56px 0 24px;">
+      <div style="display:flex; align-items:baseline; gap:16px; margin-bottom:6px;">
+        <span style="font-family:'PublicPixel'; font-size:9px; color:#2f6fd6;">01</span>
+        <h2 style="font-family:'PublicPixel'; font-size:18px; line-height:1.55; margin:0; color:#fff;">BİRİMLER</h2>
+      </div>
+      <p style="margin:0 0 28px; color:#7d8597; font-size:14px;">Counter üçgeni: piyade · nişancı · RPG'ci · tank. Her birim takım rengiyle boyanır.</p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:18px;">
+        <sc-for list="{{ units }}" as="u" hint-placeholder-count="5">
+          <div style="background:#181c25; border:1px solid #262c3a; border-radius:14px; overflow:hidden; display:flex; flex-direction:column;">
+            <div style="position:relative; background:radial-gradient(circle at 50% 38%, #2c3a2a 0%, #1c2620 70%); display:flex; align-items:center; justify-content:center; padding:18px 0 8px; min-height:160px;">
+              <span style="position:absolute; top:12px; right:14px; font-family:'PublicPixel'; font-size:7px; color:#5a6478;">{{ u.tag }}</span>
+              <canvas data-sprite="{{ u.id }}" data-anim="cycle" data-s="9" width="144" height="144" style="width:144px; height:144px;"></canvas>
+            </div>
+            <div style="padding:16px 18px 18px; border-top:1px solid #232a38;">
+              <div style="display:flex; align-items:baseline; justify-content:space-between; gap:8px;">
+                <h3 style="font-family:'PublicPixel'; font-size:12px; margin:0; color:#fff;">{{ u.name }}</h3>
+                <span style="font-size:11px; color:#5a6478;">{{ u.cost }}</span>
+              </div>
+              <p style="margin:8px 0 14px; font-size:12.5px; color:#8b94a7; line-height:1.5; min-height:36px;">{{ u.blurb }}</p>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <sc-for list="{{ u.stats }}" as="st" hint-placeholder-count="3">
+                  <span style="font-size:10px; font-family:'PublicPixel'; padding:5px 7px; background:#212835; border-radius:6px; color:#aeb7c8;">{{ st }}</span>
+                </sc-for>
+              </div>
+              <div style="display:flex; gap:8px; margin-top:16px; flex-wrap:wrap;">
+                <sc-for list="{{ u.anims }}" as="a" hint-placeholder-count="4">
+                  <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
+                    <div style="background:#10131a; border:1px solid #232a38; border-radius:8px; padding:3px;">
+                      <canvas data-sprite="{{ u.id }}" data-anim="{{ a.id }}" data-s="4" width="64" height="64" style="width:64px; height:64px;"></canvas>
+                    </div>
+                    <span style="font-family:'PublicPixel'; font-size:6.5px; color:#6b7488; letter-spacing:0.5px;">{{ a.label }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="padding:40px 0 24px;">
+      <div style="display:flex; align-items:baseline; gap:16px; margin-bottom:6px;">
+        <span style="font-family:'PublicPixel'; font-size:9px; color:#2f6fd6;">02</span>
+        <h2 style="font-family:'PublicPixel'; font-size:18px; line-height:1.55; margin:0; color:#fff;">BİNALAR</h2>
+      </div>
+      <p style="margin:0 0 28px; color:#7d8597; font-size:14px;">Çatılar takım rengini taşır. Hafif dokunuşlar: bacadan duman, dalgalanan bayrak, parlayan camlar, dönen taret.</p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:18px;">
+        <sc-for list="{{ buildings }}" as="b" hint-placeholder-count="7">
+          <div style="background:#181c25; border:1px solid #262c3a; border-radius:14px; overflow:hidden;">
+            <div style="position:relative; background:radial-gradient(circle at 50% 70%, #2c3a2a 0%, #1c2620 72%); display:flex; align-items:center; justify-content:center; padding:14px 0 4px; min-height:178px;">
+              <span style="position:absolute; top:12px; right:14px; font-family:'PublicPixel'; font-size:7px; color:#5a6478;">{{ b.size }}</span>
+              <canvas data-sprite="{{ b.id }}" data-anim="idle" data-s="7" width="182" height="182" style="width:182px; height:182px;"></canvas>
+            </div>
+            <div style="padding:14px 18px 18px; border-top:1px solid #232a38;">
+              <div style="display:flex; align-items:baseline; justify-content:space-between; gap:8px;">
+                <h3 style="font-family:'PublicPixel'; font-size:11px; margin:0; color:#fff;">{{ b.name }}</h3>
+                <span style="font-size:10px; font-family:'PublicPixel'; color:#5a6478;">{{ b.hp }}HP</span>
+              </div>
+              <p style="margin:8px 0 0; font-size:12.5px; color:#8b94a7; line-height:1.5;">{{ b.blurb }}</p>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="padding:40px 0 24px;">
+      <div style="display:flex; align-items:baseline; gap:16px; margin-bottom:6px;">
+        <span style="font-family:'PublicPixel'; font-size:9px; color:#2f6fd6;">03</span>
+        <h2 style="font-family:'PublicPixel'; font-size:18px; line-height:1.55; margin:0; color:#fff;">ZEMİN DÖŞEMELERİ</h2>
+      </div>
+      <p style="margin:0 0 28px; color:#7d8597; font-size:14px;">Deterministik haritanın yapı taşları — 3×3 döşenmiş örnek, kesintisiz tekrar eder.</p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:18px;">
+        <sc-for list="{{ tiles }}" as="t" hint-placeholder-count="5">
+          <div style="background:#181c25; border:1px solid #262c3a; border-radius:14px; overflow:hidden;">
+            <div style="display:flex; align-items:center; justify-content:center; padding:16px; background:#0f1219;">
+              <canvas data-sprite="{{ t.id }}" data-anim="tile" data-s="3" width="192" height="192" style="width:192px; height:192px; border-radius:6px;"></canvas>
+            </div>
+            <div style="padding:12px 16px 16px; border-top:1px solid #232a38; display:flex; align-items:baseline; justify-content:space-between;">
+              <h3 style="font-family:'PublicPixel'; font-size:11px; margin:0; color:#fff;">{{ t.name }}</h3>
+              <span style="font-size:11.5px; color:#7d8597;">{{ t.blurb }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="padding:40px 0 24px;">
+      <div style="display:flex; align-items:baseline; gap:16px; margin-bottom:6px;">
+        <span style="font-family:'PublicPixel'; font-size:9px; color:#2f6fd6;">04</span>
+        <h2 style="font-family:'PublicPixel'; font-size:18px; line-height:1.55; margin:0; color:#fff;">EFEKTLER</h2>
+      </div>
+      <p style="margin:0 0 28px; color:#7d8597; font-size:14px;">Savaşın tuzu biberi — atış, isabet ve emek anları.</p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:18px;">
+        <sc-for list="{{ effects }}" as="e" hint-placeholder-count="5">
+          <div style="background:#181c25; border:1px solid #262c3a; border-radius:14px; overflow:hidden;">
+            <div style="display:flex; align-items:center; justify-content:center; padding:14px; background:radial-gradient(circle at 50% 50%, #20262f 0%, #14181f 75%); min-height:128px;">
+              <canvas data-sprite="{{ e.id }}" data-anim="fx" data-s="6" width="120" height="120" style="width:120px; height:120px;"></canvas>
+            </div>
+            <div style="padding:12px 16px 16px; border-top:1px solid #232a38;">
+              <h3 style="font-family:'PublicPixel'; font-size:10px; margin:0 0 4px; color:#fff;">{{ e.name }}</h3>
+              <p style="margin:0; font-size:11.5px; color:#7d8597; line-height:1.45;">{{ e.blurb }}</p>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+  </main>
+
+  <footer style="max-width:1240px; margin:0 auto; padding:36px 40px 0; border-top:1px solid #232836; color:#5a6478; font-size:12px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+    <span>Tümü orijinal · CC0 ruhuna uygun · {{ assetCount }} asset</span>
+    <span style="font-family:'PublicPixel'; font-size:8px;">v0.1 · 16PX GRID</span>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { team: 'P1', zoom: true, paused: false };
+
+  // ---- palettes ----
+  TEAM = {
+    P1: { main:'#3a78d8', dark:'#27508f', light:'#7fb0ff', deep:'#173260' },
+    P2: { main:'#dc4636', dark:'#9c2820', light:'#ff8473', deep:'#5e150f' },
+  };
+  SK = '#f1b487'; SKD = '#cd8a5b'; BOOT = '#39323a'; STEEL = '#5a6473'; STEELD = '#3c4350';
+
+  renderVals() {
+    const t = this.TEAM[this.state.team];
+    const btn = (active, col) => `font-family:'PublicPixel'; font-size:8px; letter-spacing:0.5px; cursor:pointer; padding:9px 12px; border-radius:8px; transition:all .12s; border:1px solid ${active?col:'#2a3140'}; background:${active? col : '#1a1f29'}; color:${active? '#fff':'#7d8597'}; box-shadow:${active? '0 2px 0 rgba(0,0,0,0.4)':'none'};`;
+    const sbtn = (active) => `font-family:'PublicPixel'; font-size:7px; letter-spacing:0.5px; cursor:pointer; padding:8px 11px; border-radius:8px; border:1px solid #2a3140; background:${active? '#222a36':'#1a1f29'}; color:${active? '#cdd5e2':'#6b7488'};`;
+    return {
+      setRoot: (el) => { this.rootEl = el; },
+      pickP1: () => this.setState({ team:'P1' }),
+      pickP2: () => this.setState({ team:'P2' }),
+      toggleZoom: () => this.setState(s => ({ zoom: !s.zoom })),
+      togglePause: () => this.setState(s => ({ paused: !s.paused })),
+      p1BtnStyle: btn(this.state.team==='P1', '#3a78d8'),
+      p2BtnStyle: btn(this.state.team==='P2', '#dc4636'),
+      zoomBtnStyle: sbtn(this.state.zoom),
+      pauseBtnStyle: sbtn(this.state.paused),
+      zoomLabel: this.state.zoom ? '4× ZOOM' : '1× GERÇEK',
+      pauseLabel: this.state.paused ? '▶ OYNAT' : '❚❚ DURDUR',
+      assetCount: 22,
+      units: [
+        { id:'worker',   name:'İŞÇİ',    tag:'WORKER',   cost:'30🍖', blurb:'Kaynak toplar ve bina inşa eder. Sivil omurga.', stats:['60 HP','HIZ 2.5'], anims:[{id:'idle',label:'IDLE'},{id:'walk',label:'YÜRÜ'},{id:'gather',label:'TOPLA'},{id:'build',label:'İNŞA'}] },
+        { id:'rifleman', name:'PİYADE',  tag:'RIFLE',    cost:'40🍖 20💰', blurb:'Ucuz, çok yönlü. Nişancıya yaklaşınca döver.', stats:['90 HP','HASAR 8','MNZ 3'], anims:[{id:'idle',label:'IDLE'},{id:'walk',label:'YÜRÜ'},{id:'attack',label:'ATEŞ'},{id:'death',label:'ÖLÜM'}] },
+        { id:'sniper',   name:'NİŞANCI', tag:'SNIPER',   cost:'50🍖 50💰', blurb:'Uzun menzil. Piyade sınıfına ×2 hasar.', stats:['55 HP','HASAR 22','MNZ 6'], anims:[{id:'idle',label:'IDLE'},{id:'walk',label:'YÜRÜ'},{id:'attack',label:'ATEŞ'},{id:'death',label:'ÖLÜM'}] },
+        { id:'rpg',      name:"RPG'Cİ",  tag:'RPG',      cost:'60🍖 60💰', blurb:'Zırh ve binaya ×2.5. Tankların kâbusu.', stats:['70 HP','HASAR 30','MNZ 4'], anims:[{id:'idle',label:'IDLE'},{id:'walk',label:'YÜRÜ'},{id:'attack',label:'ATEŞ'},{id:'death',label:'ÖLÜM'}] },
+        { id:'tank',     name:'TANK',    tag:'ARMOR',    cost:'150💰 80🪨', blurb:'Etli zırh. Piyadeyi biçer (×1.5), yavaş ilerler.', stats:['450 HP','HASAR 24','POP 3'], anims:[{id:'idle',label:'IDLE'},{id:'walk',label:'YÜRÜ'},{id:'attack',label:'ATEŞ'},{id:'death',label:'ÖLÜM'}] },
+      ],
+      buildings: [
+        { id:'city_hall', name:'BELEDİYE', size:'2×2', hp:'1500', blurb:'Şehrin kalbi. Yıkılırsa oyun biter. İşçi üretir.' },
+        { id:'house',     name:'EV',       size:'1×1', hp:'300',  blurb:'Nüfus kapasitesi +4. Bacasından duman tüter.' },
+        { id:'greenhouse',name:'SERA',     size:'1×1', hp:'250',  blurb:'Pasif yiyecek üretir. Cam panellerde yeşillik.' },
+        { id:'bank',      name:'BANKA',    size:'1×1', hp:'400',  blurb:'Pasif para basar. Camları altın parıltılı.' },
+        { id:'barracks',  name:'KIŞLA',    size:'2×2', hp:'600',  blurb:'Piyade, nişancı, RPG eğitir. Bayrak dalgalanır.' },
+        { id:'factory',   name:'FABRİKA',  size:'2×2', hp:'800',  blurb:'Tank üretir. Bacadan kalın duman çıkar.' },
+        { id:'turret',    name:'TARET',    size:'1×1', hp:'500',  blurb:'Şehri savunur. Namlu tarar, hedefe ateş eder.' },
+      ],
+      tiles: [
+        { id:'grass',  name:'ÇİM',    blurb:'inşa zemini' },
+        { id:'water',  name:'SU',     blurb:'geçilmez' },
+        { id:'bridge', name:'KÖPRÜ',  blurb:'nehir geçişi' },
+        { id:'forest', name:'ORMAN',  blurb:'odun · 50' },
+        { id:'stone',  name:'TAŞ',    blurb:'taş · 200' },
+      ],
+      effects: [
+        { id:'muzzle',    name:'NAMLU ATEŞİ', blurb:'Silah ateşlendiğinde parlama.' },
+        { id:'tracer',    name:'MERMİ İZİ',   blurb:'Mermi havayı yararak geçer.' },
+        { id:'explosion', name:'PATLAMA',     blurb:'RPG isabeti ve yıkım anı.' },
+        { id:'gather_fx', name:'TOPLAMA',     blurb:'Odun yongaları savrulur.' },
+        { id:'build_fx',  name:'İNŞA TOZU',   blurb:'Bina yükselirken toz kalkar.' },
+      ],
+    };
+  }
+
+  // ---------- pixel helpers ----------
+  p(c,x,y,w,h,col,S){ c.fillStyle=col; c.fillRect(Math.round(x*S),Math.round(y*S),Math.max(1,Math.ceil((w==null?1:w)*S)),Math.max(1,Math.ceil((h==null?1:h)*S))); }
+  disc(c,cx,cy,r,col,S){ const r2=r*r; for(let y=Math.floor(cy-r);y<=cy+r;y++){ for(let x=Math.floor(cx-r);x<=cx+r;x++){ const dx=x+0.5-cx,dy=y+0.5-cy; if(dx*dx+dy*dy<=r2) this.p(c,x,y,1,1,col,S);} } }
+  ring(c,cx,cy,r,col,S,th){ th=th||1; const ro=r*r, ri=(r-th)*(r-th); for(let y=Math.floor(cy-r);y<=cy+r;y++){ for(let x=Math.floor(cx-r);x<=cx+r;x++){ const dx=x+0.5-cx,dy=y+0.5-cy,d=dx*dx+dy*dy; if(d<=ro&&d>=ri) this.p(c,x,y,1,1,col,S);} } }
+
+  // ---------- units ----------
+  drawHumanoid(c,S,t,team,role,anim){
+    const T=this.TEAM[team];
+    // anim state
+    let bob=0, alpha=1, dieP=0, walk=0, fire=0, swingY=0, swingX=0, recoil=0;
+    if(anim==='idle'){ bob=Math.sin(t*3)*0.4; }
+    else if(anim==='walk'){ walk=t*8; bob=-Math.abs(Math.sin(walk))*0.7; }
+    else if(anim==='attack'){ const f=t%1.1; bob=Math.sin(t*3)*0.3; if(f<0.22){ fire=1-f/0.22; recoil=fire*1.3; } }
+    else if(anim==='death'){ const c2=t%2.6; if(c2<0.7){dieP=this.ease(c2/0.7);}else if(c2<2.1){dieP=1; alpha=Math.max(0,1-(c2-1.4)/0.7);} else {dieP=1; alpha=Math.min(1,(c2-2.1)/0.5); if(c2>2.45) dieP=1-this.ease((c2-2.45)/0.15);} }
+    else if(anim==='gather'){ const f=(t*1.6)%1; swingY=Math.sin(f*Math.PI)* (f<0.5?2.2:2.2); swingX=Math.sin(f*Math.PI)*1.4; bob=0; }
+    else if(anim==='build'){ const f=(t*2.2)%1; swingY=-Math.abs(Math.sin(f*Math.PI))*2.4; bob=0; }
+
+    c.save();
+    c.globalAlpha=alpha;
+    // ground shadow (stays put)
+    this.disc(c,8,13.6,2.6,'rgba(0,0,0,0.20)',S);
+    // death rotation about feet
+    if(dieP>0){ c.translate(8*S,14*S); c.rotate(dieP*Math.PI/2*0.92); c.translate(-8*S,-14*S); }
+    c.translate(0,bob*S);
+    this.bodyHuman(c,S,T,role,{walk,fire,recoil,swingX,swingY,anim});
+    c.restore();
+  }
+
+  bodyHuman(c,S,T,role,o){
+    const sw = o.walk? Math.sin(o.walk):0;
+    const aw = o.walk? Math.sin(o.walk+Math.PI):0;
+    // legs (behind torso)
+    const lf = 8.4 + sw*1.1, lb = 6.3 - sw*1.1;
+    const lfy = 11 - Math.max(0,sw)*0.5, lby = 11 - Math.max(0,-sw)*0.5;
+    this.p(c, lb,lby,1.6,2.4, T.dark,S); this.p(c, lb,lby+2.2,1.7,1, this.BOOT,S);
+    this.p(c, lf,lfy,1.6,2.4, T.dark,S); this.p(c, lf,lfy+2.2,1.7,1, this.BOOT,S);
+    // back arm
+    const backAY = 7 + (o.walk? aw*0.6:0);
+    this.p(c, 5.0,backAY,1.4,3.2, T.dark,S);
+    this.p(c, 5.0,backAY+3, 1.5,1.1, this.SK,S);
+    // torso
+    this.p(c, 5.3,6.4,4.6,5.2, T.main,S);
+    this.p(c, 5.3,6.4,1,5.2, T.deep,S);      // shade
+    this.p(c, 9.0,6.6,0.9,5.0, T.dark,S);    // edge
+    this.p(c, 5.3,9.6,4.6,0.9, T.light,S);   // belt accent
+    this.p(c, 6.6,6.4,0.9,3, T.light,S);     // zipper/stripe
+    // head
+    this.p(c, 6.0,2.6,4.2,4.0, this.SK,S);
+    this.p(c, 6.0,2.6,1,4.0, this.SKD,S);     // face shade
+    this.p(c, 9.0,4.2,1.1,1.6, this.SKD,S);   // jaw shade
+    this.p(c, 8.7,3.9,0.9,0.9, '#2a2230',S);  // eye (facing right)
+    // headgear + front-arm/weapon per role
+    this.headgear(c,S,T,role);
+    this.weapon(c,S,T,role,o);
+  }
+
+  headgear(c,S,T,role){
+    if(role==='worker'){
+      this.p(c,5.6,1.6,5,1.6,'#f5c542',S); this.p(c,6.2,0.7,3.8,1.1,'#f5c542',S); this.p(c,5.6,1.6,5,0.5,'#ffe07a',S); this.p(c,5.6,2.9,5,0.5,'#caa024',S);
+    } else if(role==='rifleman'){
+      this.p(c,5.7,1.5,4.9,1.7,T.dark,S); this.p(c,6.3,0.7,3.6,1,T.dark,S); this.p(c,9.4,2.0,1.6,0.9,T.dark,S); this.p(c,5.7,1.5,4.9,0.5,T.light,S); this.p(c,7.0,1.0,0.9,0.9,T.light,S);
+    } else if(role==='sniper'){
+      this.p(c,5.6,1.7,5.0,1.4,'#3f5a2f',S); this.p(c,9.3,2.2,2.0,0.9,'#3f5a2f',S); this.p(c,5.6,1.7,5,0.45,'#56743f',S); this.p(c,6.2,1.2,3.4,0.7,'#3f5a2f',S); this.p(c,6.0,5.6,3.2,0.9,'#4d6b34',S); // green scarf
+    } else if(role==='rpg'){
+      this.p(c,5.7,1.7,4.8,1.4,'#34302e',S); this.p(c,6.2,1.1,3.6,0.8,'#34302e',S); this.p(c,5.7,1.7,4.8,0.45,T.main,S); this.p(c,5.9,5.5,3.2,0.9,T.dark,S); // bandana
+    }
+  }
+
+  weapon(c,S,T,role,o){
+    const rc = o.recoil||0;
+    const ax = -rc; // recoil pushes back (left)
+    const fy = 7.2 + (o.swingY||0);
+    const fx = (o.swingX||0);
+    if(role==='worker'){
+      // front arm + wrench/hammer
+      this.p(c, 8.9+fx, fy, 1.4, 2.6, this.SK,S);
+      // hammer head
+      const hx=9.7+fx, hy=fy-0.4+ (o.swingY||0)*0.2;
+      this.p(c, hx, fy+2.2, 0.9, 2.6, '#8a6a44',S); // handle
+      this.p(c, hx-0.6, fy+4.4, 2.2, 1.2, '#7d828c',S); // head
+      this.p(c, hx-0.6, fy+4.4, 2.2, 0.45, '#a8adb8',S);
+    } else if(role==='rifleman'){
+      this.p(c, 9.0+ax, 7.0, 1.4, 2.5, this.SK,S); // arm
+      this.p(c, 9.6+ax, 7.4, 4.0, 1.0, this.STEELD,S); // barrel
+      this.p(c, 9.4+ax, 7.0, 1.6, 1.9, '#43474f',S); // body
+      this.p(c, 10.0+ax, 8.3, 1.0, 1.3, '#43474f',S); // mag
+      this.p(c, 8.9+ax, 7.4, 0.9, 1.6, '#2f333a',S); // stock
+      if(o.fire>0){ this.muzzle(c,S,13.8+ax,7.9,o.fire); }
+    } else if(role==='sniper'){
+      this.p(c, 9.0+ax, 7.0, 1.4, 2.5, this.SK,S);
+      this.p(c, 9.4+ax, 7.6, 6.0, 0.85, this.STEELD,S); // long barrel
+      this.p(c, 9.3+ax, 7.1, 1.7, 1.7, '#3c4350',S);
+      this.p(c, 10.6+ax, 6.6, 1.4, 0.8, '#23262d',S); // scope
+      this.p(c, 8.8+ax, 7.5, 0.9, 1.5, '#2f333a',S); // stock
+      this.p(c, 12.6+ax, 8.4, 0.8, 1.2, '#3c4350',S); // bipod
+      if(o.fire>0){ this.muzzle(c,S,15.7+ax,8.0,o.fire); }
+    } else if(role==='rpg'){
+      this.p(c, 8.8+ax, 6.6, 1.4, 2.6, this.SK,S);
+      this.p(c, 8.0+ax, 5.4, 6.4, 1.7, '#3a4a2e',S); // tube
+      this.p(c, 8.0+ax, 5.4, 6.4, 0.5, '#536b3c',S);
+      this.p(c, 13.9+ax, 5.0, 1.6, 2.5, T.main,S);    // warhead
+      this.p(c, 14.6+ax, 4.6, 0.9, 3.3, T.light,S);
+      this.p(c, 7.2+ax, 5.6, 0.9, 1.3, '#2c2622',S);  // rear
+      if(o.fire>0){ this.disc(c,7.0+ax,6.2,1.4+o.fire*1.4,`rgba(255,170,60,${0.5*o.fire})`,S); this.muzzle(c,S,16.2+ax,5.9,o.fire); }
+    }
+  }
+
+  muzzle(c,S,x,y,f){
+    const r=1.2+f*1.8;
+    this.disc(c,x,y,r,`rgba(255,236,150,${0.9*f})`,S);
+    this.disc(c,x,y,r*0.55,'#ffffff',S);
+    this.p(c,x-r-1.2,y-0.4,r*1.4,0.8,`rgba(255,200,80,${0.8*f})`,S);
+    this.p(c,x,y-r-1,0.8,r*0.9,`rgba(255,200,80,${0.6*f})`,S);
+    this.p(c,x,y+r,0.8,r*0.9,`rgba(255,200,80,${0.6*f})`,S);
+  }
+
+  drawTank(c,S,t,team,anim){
+    const T=this.TEAM[team];
+    let bob=0,alpha=1,dieP=0,scroll=0,recoil=0,fire=0;
+    if(anim==='idle'){ bob=Math.sin(t*2.4)*0.18; }
+    else if(anim==='walk'){ scroll=(t*9)%2; bob=Math.sin(t*9)*0.18; }
+    else if(anim==='attack'){ const f=t%1.4; if(f<0.25){fire=1-f/0.25; recoil=fire*1.6;} bob=Math.sin(t*2.4)*0.15; }
+    else if(anim==='death'){ const c2=t%2.6; if(c2<0.5)dieP=this.ease(c2/0.5); else if(c2<2.0){dieP=1; alpha=Math.max(0,1-(c2-1.1)/0.7);} else {dieP=1; alpha=Math.min(1,(c2-2.0)/0.5);} }
+    c.save(); c.globalAlpha=alpha;
+    this.disc(c,8,13.4,3.4,'rgba(0,0,0,0.22)',S);
+    if(dieP>0){ c.translate(8*S,12*S); c.rotate(dieP*0.14*Math.sin(t*20)); c.translate(-8*S,-12*S); }
+    c.translate(0,bob*S);
+    // treads
+    this.p(c,2.2,11.0,11.6,2.6,'#2c2f36',S);
+    this.p(c,2.2,11.0,11.6,0.6,'#3d424b',S);
+    for(let i=0;i<7;i++){ const x=2.6+((i*1.7+scroll)%11.5); this.p(c,x,11.5,0.8,1.6,'#15171c',S); }
+    this.disc(c,3.2,12.3,1.0,'#3d424b',S); this.disc(c,12.7,12.3,1.0,'#3d424b',S);
+    // hull
+    this.p(c,3.0,8.0,10.0,3.4, T.main,S);
+    this.p(c,3.0,8.0,10.0,0.8, T.light,S);
+    this.p(c,3.0,10.4,10.0,1.0, T.deep,S);
+    this.p(c,11.0,8.2,2.0,3.0, T.dark,S);
+    this.p(c,4.0,8.6,1.4,1.4, T.light,S); // hatch hl
+    // turret
+    const rx=-recoil;
+    this.p(c,5.4,5.6,4.6,3.0, T.dark,S);
+    this.p(c,5.4,5.6,4.6,0.7, T.light,S);
+    this.disc(c,7.6,6.9,1.5,T.main,S);
+    this.p(c,7.0,6.4,1.2,1.0,T.light,S);
+    // barrel
+    this.p(c,9.6+rx,6.2,5.4,1.2,'#3c4350',S);
+    this.p(c,9.6+rx,6.2,5.4,0.4,'#576070',S);
+    this.p(c,14.4+rx,5.9,1.0,1.8,'#2b3038',S);
+    if(fire>0){ this.muzzle(c,S,15.4+rx,6.8,fire); }
+    c.restore();
+  }
+
+  // ---------- buildings ----------
+  drawBuilding(c,S,t,team,id){
+    const T=this.TEAM[team];
+    // ground patch
+    this.disc(c,11,19.5,8.5,'rgba(0,0,0,0.14)',S);
+    if(id==='city_hall') this.bCityHall(c,S,t,T);
+    else if(id==='house') this.bHouse(c,S,t,T);
+    else if(id==='greenhouse') this.bGreenhouse(c,S,t,T);
+    else if(id==='bank') this.bBank(c,S,t,T);
+    else if(id==='barracks') this.bBarracks(c,S,t,T);
+    else if(id==='factory') this.bFactory(c,S,t,T);
+    else if(id==='turret') this.bTurret(c,S,t,T);
+  }
+
+  flag(c,S,px,py,h,T,t){
+    this.p(c,px,py,0.7,h,'#6b7280',S); // pole
+    const wav=Math.sin(t*5);
+    for(let i=0;i<5;i++){ const fy=py+0.4+Math.sin(t*5 - i*0.6)*0.5; this.p(c,px+0.7+i*0.9, fy, 1.0, 2.4, i%2? T.light:T.main,S); }
+    this.p(c,px-0.2,py-0.4,1.1,0.8,'#d9b94a',S); // finial
+  }
+  smoke(c,S,px,py,t,col,sp){
+    sp=sp||1;
+    for(let i=0;i<3;i++){ const ph=((t*sp*0.5)+i*0.34)%1; const yy=py-ph*6.5; const xx=px+Math.sin(ph*4+i)*1.2; const r=0.7+ph*1.7; const a=(1-ph)*0.5; this.disc(c,xx,yy,r,`rgba(${col},${a})`,S); }
+  }
+
+  bCityHall(c,S,t,T){
+    this.p(c,3.5,17.5,15,3.0,'#cfc7b2',S); // base steps
+    this.p(c,3.5,17.5,15,0.6,'#e6dec8',S);
+    this.p(c,4.5,9.5,13,8.2,'#e8e0cc',S);   // main wall
+    this.p(c,4.5,9.5,13,0.8,'#fff7e6',S);
+    this.p(c,4.5,9.5,0.9,8.2,'#bcb39a',S);
+    this.p(c,16.6,9.5,0.9,8.2,'#bcb39a',S);
+    for(let i=0;i<5;i++){ const x=5.6+i*2.3; this.p(c,x,10.6,1.3,6.5,'#f3ecd9',S); this.p(c,x,10.6,1.3,0.5,'#fffaf0',S); this.p(c,x+1.0,10.6,0.4,6.5,'#c9c0aa',S);} // columns
+    // pediment
+    for(let r=0;r<4;r++){ this.p(c,6.5+r,8.5-r,9-2*r,1.05,'#d8cfb8',S);} 
+    this.p(c,5.4,9.0,11.2,0.7,'#bcb39a',S);
+    // dome + clock
+    this.p(c,9.6,3.6,2.8,2.2,'#cdd3da',S); this.disc(c,11,3.6,1.5,'#dfe4ea',S); this.disc(c,11,3.6,0.7,T.main,S);
+    this.p(c,10.4,5.7,1.2,1.6,'#b9bfc7',S);
+    // door + banner
+    this.p(c,9.4,13.2,3.2,4.3,'#5b4a3a',S); this.p(c,9.4,13.2,3.2,0.5,'#7a6450',S);
+    this.p(c,10.2,12.4,1.6,3.2,T.main,S); this.p(c,10.2,15.0,1.6,0.9,T.light,S);
+    this.flag(c,S,10.7,0.4,2.4,T,t);
+  }
+
+  bHouse(c,S,t,T){
+    this.p(c,5.5,11.5,11,6.5,'#e7c594',S);   // wall
+    this.p(c,5.5,11.5,11,0.7,'#f6d9ac',S);
+    this.p(c,5.5,11.5,0.9,6.5,'#caa473',S);
+    // roof team-colored
+    for(let r=0;r<5;r++){ this.p(c,4.0+r*0.9,11.5-r,14-1.8*r,1.15,r===0?T.dark:T.main,S);} 
+    this.p(c,4.0,11.0,14,0.6,T.light,S);
+    // door + windows
+    this.p(c,9.6,13.6,2.6,4.4,'#7a4a2a',S); this.p(c,9.6,13.6,2.6,0.5,'#9a6440',S); this.p(c,11.4,15.6,0.5,0.5,'#f5c542',S);
+    this.p(c,6.6,13.2,2.0,2.0,'#ffd97a',S); this.p(c,6.6,13.2,2.0,0.5,'#fff0c0',S); this.p(c,7.55,13.2,0.4,2.0,'#caa473',S);
+    this.p(c,13.0,13.2,2.0,2.0,'#ffd97a',S); this.p(c,13.95,13.2,0.4,2.0,'#caa473',S);
+    // chimney + smoke
+    this.p(c,13.6,7.0,1.6,3.0,'#9c5a3a',S); this.p(c,13.4,6.7,2.0,0.7,'#7a4329',S);
+    this.smoke(c,S,14.4,6.3,t,'150,150,160',1);
+  }
+
+  bGreenhouse(c,S,t,T){
+    this.p(c,5.0,10.5,12,7.5,'#cfeef0',S);   // glass body
+    this.p(c,5.0,10.5,12,7.5,'rgba(160,220,210,0.0)',S);
+    // frame
+    this.p(c,5.0,10.5,12,0.8,'#eafcff',S);
+    this.p(c,5.0,10.5,0.8,7.5,'#9fc7c2',S); this.p(c,16.2,10.5,0.8,7.5,'#9fc7c2',S);
+    for(let i=1;i<4;i++){ this.p(c,5.0+i*3.0,10.5,0.6,7.5,'#a9d2cd',S);} 
+    this.p(c,5.0,13.8,12,0.6,'#a9d2cd',S);
+    // roof glass triangle
+    for(let r=0;r<4;r++){ this.p(c,5.6+r*0.9,10.5-r,10.8-1.8*r,1.1,'#d9f4f5',S);} 
+    this.p(c,5.0,10.2,12,0.5,'#bfe4e0',S);
+    // plants inside (sway)
+    const sw=Math.sin(t*2)*0.4;
+    for(let i=0;i<4;i++){ const x=6.2+i*2.7+sw*((i%2)?1:-1); this.p(c,x,15.0,1.0,2.6,'#3c9a4a',S); this.disc(c,x+0.5,14.6,1.1,'#52b95f',S); this.p(c,x+0.2,13.9,0.5,0.5,'#ff6b8a',S);} 
+    // glass glint
+    const g=(Math.sin(t*1.5)+1)/2; this.p(c,6.4,11.2,1.4,3.0,`rgba(255,255,255,${0.25+g*0.4})`,S);
+  }
+
+  bBank(c,S,t,T){
+    this.p(c,4.6,17.4,12.8,1.4,'#c8cdd6',S); // step
+    this.p(c,5.2,9.8,11.6,7.8,'#dfe3ea',S);  // wall
+    this.p(c,5.2,9.8,11.6,0.8,'#f2f5fa',S);
+    this.p(c,5.2,9.8,0.9,7.8,'#bcc2cc',S);
+    // columns
+    for(let i=0;i<4;i++){ const x=6.2+i*2.7; this.p(c,x,11.0,1.3,6.2,'#eef1f6',S); this.p(c,x+1.0,11.0,0.4,6.2,'#c2c8d2',S);} 
+    // pediment
+    for(let r=0;r<3;r++){ this.p(c,6.4+r,9.6-r,9.2-2*r,1.0,'#cfd4dd',S);} 
+    // $ emblem
+    const g=(Math.sin(t*2.2)+1)/2;
+    this.disc(c,11,7.2,1.6,'#f3c64a',S); this.disc(c,11,7.2,1.6*(0.5+g*0.4),'#ffe07a',S);
+    this.p(c,10.8,6.2,0.5,2.0,'#7a5a16',S); this.p(c,10.2,6.6,1.6,0.45,'#7a5a16',S); this.p(c,10.2,7.6,1.6,0.45,'#7a5a16',S);
+    // glowing windows
+    this.p(c,7.3,12.0,1.4,3.6,`rgba(255,210,90,${0.55+g*0.4})`,S);
+    this.p(c,13.4,12.0,1.4,3.6,`rgba(255,210,90,${0.55+g*0.4})`,S);
+    this.p(c,9.7,13.0,2.6,4.4,'#5a4a2a',S); this.p(c,9.7,13.0,2.6,0.5,'#7a6440',S);
+  }
+
+  bBarracks(c,S,t,T){
+    this.p(c,4.4,17.4,13.2,1.3,'#7c7058',S);
+    this.p(c,5.0,11.0,12,6.6,'#8a8466',S);   // khaki wall
+    this.p(c,5.0,11.0,12,0.7,'#a8a17e',S);
+    this.p(c,5.0,11.0,0.9,6.6,'#6f6a50',S);
+    // roof
+    for(let r=0;r<4;r++){ this.p(c,4.2+r*0.9,11.0-r,13.6-1.8*r,1.1,r===0?T.dark:T.main,S);} 
+    // door + star
+    this.p(c,9.6,13.0,2.8,4.6,'#4a4636',S); this.p(c,9.6,13.0,2.8,0.5,'#5f5a44',S);
+    this.disc(c,11,11.9,1.2,T.light,S); this.p(c,10.6,11.5,0.8,0.8,'#fff',S);
+    // sandbags
+    for(let i=0;i<6;i++){ this.disc(c,5.6+i*1.9,17.6,0.95,'#b6a06a',S);} 
+    // windows
+    this.p(c,6.4,13.2,1.6,1.6,'#3a4632',S); this.p(c,14.0,13.2,1.6,1.6,'#3a4632',S);
+    this.flag(c,S,15.4,7.0,2.2,T,t);
+  }
+
+  bFactory(c,S,t,T){
+    this.p(c,4.6,11.0,12.8,6.8,'#9aa0a8',S);  // wall
+    this.p(c,4.6,11.0,12.8,0.8,'#b6bcc4',S);
+    this.p(c,4.6,11.0,0.9,6.8,'#7d828c',S);
+    // sawtooth roof
+    for(let i=0;i<4;i++){ const x=5.0+i*3.0; this.p(c,x,9.6,2.6,1.6,'#7d828c',S); this.p(c,x,9.6,2.6,0.5,T.main,S);} 
+    // big chimney
+    this.p(c,13.2,4.2,2.4,7.0,'#7d828c',S); this.p(c,13.0,3.9,2.8,0.8,'#5e636d',S); this.p(c,13.2,6.0,2.4,0.7,T.main,S);
+    this.smoke(c,S,14.4,3.4,t,'120,124,132',1.4);
+    this.smoke(c,S,14.7,3.4,t+0.5,'140,144,152',1.2);
+    // gear emblem
+    this.disc(c,8.0,13.8,1.7,'#5e636d',S); this.disc(c,8.0,13.8,0.8,'#9aa0a8',S);
+    for(let k=0;k<6;k++){ const a=k*Math.PI/3; this.p(c,8.0+Math.cos(a)*1.9-0.35,13.8+Math.sin(a)*1.9-0.35,0.7,0.7,'#5e636d',S);} 
+    // door
+    this.p(c,10.6,13.4,3.4,4.4,'#4a4e56',S); this.p(c,10.6,13.4,3.4,0.5,'#646973',S);
+    for(let i=0;i<4;i++) this.p(c,10.6,14.0+i*1.0,3.4,0.4,'#3a3e46',S);
+  }
+
+  bTurret(c,S,t,T){
+    this.p(c,6.2,13.0,9.6,5.0,'#b9bec7',S);   // base
+    this.p(c,6.2,13.0,9.6,0.8,'#d3d8df',S);
+    this.p(c,6.2,13.0,0.9,5.0,'#9aa0a9',S);
+    this.p(c,6.2,15.8,9.6,2.2,T.dark,S);      // team band
+    this.p(c,6.2,15.8,9.6,0.6,T.light,S);
+    // rotating gun head
+    const ang=Math.sin(t*1.3)*0.5; const fire=(t%1.6)<0.18? 1-((t%1.6)/0.18):0;
+    const cx=11, cy=11.2;
+    this.disc(c,cx,cy,2.4,'#5e636d',S); this.disc(c,cx,cy,2.4,'#5e636d',S);
+    this.disc(c,cx,cy,1.5,T.main,S); this.p(c,cx-0.8,cy-1.0,1.0,1.0,T.light,S);
+    const bx=cx+Math.cos(ang)*5.0, by=cy+Math.sin(ang)*5.0-0.6;
+    c.save(); c.translate(cx*S,cy*S); c.rotate(ang); 
+    this.p(c,0,-0.6,5.4-fire*1.4,1.3,'#3c4350',S); this.p(c,0,-0.6,5.4,0.4,'#576070',S);
+    c.restore();
+    if(fire>0){ this.muzzle(c,S,cx+Math.cos(ang)*5.4,cy+Math.sin(ang)*5.4,fire); }
+  }
+
+  // ---------- tiles ----------
+  drawTile(c,S,t,id){
+    for(let gy=0;gy<3;gy++) for(let gx=0;gx<3;gx++) this.tile1(c,S,t,id,gx*16,gy*16,gx+gy*3);
+  }
+  tile1(c,S,t,id,ox,oy,seed){
+    if(id==='water' || id==='bridge'){ this.tWater(c,S,t,ox,oy,seed); if(id==='bridge'){ this.tBridgeTop(c,S,t,ox,oy,seed);} return; }
+    // grass base for grass/forest/stone
+    this.p(c,ox,oy,16,16,'#5fb84f',S);
+    this.p(c,ox,oy,16,16,'#5fb84f',S);
+    // texture blades (deterministic)
+    const r=(n)=>{ const x=Math.sin((seed*97.13+n*13.7))*43758.5453; return x-Math.floor(x); };
+    for(let i=0;i<10;i++){ const bx=ox+r(i)*15, by=oy+r(i+40)*15; this.p(c,bx,by,1,1, r(i+9)>0.5?'#54a945':'#74cf63',S);} 
+    if(id==='grass'){ const sw=Math.sin(t*2+seed)*0.5; this.p(c,ox+7+sw,oy+9,0.7,1.6,'#3f9a37',S); this.p(c,ox+7+sw,oy+8.5,0.9,0.9, seed%2?'#ffe14d':'#ff7aa0',S); }
+    if(id==='forest'){ this.tTree(c,S,t,ox,oy,seed); }
+    if(id==='stone'){ this.tRock(c,S,t,ox,oy,seed); }
+  }
+  tWater(c,S,t,ox,oy,seed){
+    this.p(c,ox,oy,16,16,'#2f7fcf',S);
+    this.p(c,ox,oy,16,16,'#2f7fcf',S);
+    for(let row=0;row<16;row+=2){ const off=(Math.sin(t*1.6+row*0.5+seed)*3+row); for(let k=0;k<2;k++){ const x=ox+((off+k*8)%16); this.p(c,x,oy+row,3,1,'#5aa0e6',S);} }
+    const g=(Math.sin(t*1.2+seed)+1)/2; this.p(c,ox+3,oy+3,2,1,`rgba(255,255,255,${0.3+g*0.3})`,S);
+  }
+  tBridgeTop(c,S,t,ox,oy,seed){
+    this.p(c,ox,oy+4,16,8,'#b07a43',S);
+    this.p(c,ox,oy+4,16,1,'#caa069',S);
+    this.p(c,ox,oy+11,16,1,'#8a5e30',S);
+    for(let i=0;i<8;i++){ this.p(c,ox+i*2,oy+4,0.5,8,'#8a5e30',S);} 
+    this.p(c,ox,oy+4,16,0.6,'#5e3f20',S); this.p(c,ox,oy+11.6,16,0.6,'#5e3f20',S);
+  }
+  tTree(c,S,t,ox,oy,seed){
+    const sw=Math.sin(t*1.6+seed)*0.6;
+    this.p(c,ox+7.4,oy+9,1.6,4,'#6e4a2a',S); this.p(c,ox+7.4,oy+9,0.6,4,'#5a3a20',S);
+    this.disc(c,ox+8+sw,oy+6,4.0,'#2f8a3e',S);
+    this.disc(c,ox+8+sw,oy+5.4,3.0,'#46a851',S);
+    this.disc(c,ox+6.8+sw,oy+4.6,1.2,'#62c46c',S);
+    this.disc(c,ox+8+sw,oy+9.4,4.0,'rgba(0,0,0,0)',S);
+  }
+  tRock(c,S,t,ox,oy,seed){
+    this.disc(c,ox+8,oy+11,3.0,'rgba(0,0,0,0.12)',S);
+    this.disc(c,ox+7,oy+9,2.6,'#9aa0a9',S); this.disc(c,ox+10,oy+10,2.0,'#868d97',S);
+    this.disc(c,ox+7,oy+8.2,2.0,'#b3b9c1',S);
+    this.p(c,ox+5.5,oy+9.5,1,1,'#747983',S);
+    const g=(Math.sin(t*2.4+seed)+1)/2; if(g>0.7) this.p(c,ox+6.4,oy+7.6,0.9,0.9,`rgba(255,255,255,${g})`,S);
+  }
+
+  // ---------- effects ----------
+  drawEffect(c,S,t,id){
+    const cx=8, cy=8;
+    if(id==='muzzle'){ const f=Math.max(0,1-((t*2.2)%1)/0.5); if(f>0){ this.muzzle(c,S,cx,cy,f); this.p(c,cx-6,cy-0.4,4,0.9,'#3c4350',S); this.p(c,cx-4,cy-0.6,2,1.3,'#43474f',S);} }
+    else if(id==='tracer'){ const ph=(t*1.1)%1; const x=2+ph*12; this.p(c,2,cy,x-2,0.7,`rgba(255,210,120,0.35)`,S); this.disc(c,x,cy,0.9,'#fff3b0',S); this.p(c,x-2,cy-0.3,2,0.7,'#ffd070',S); }
+    else if(id==='explosion'){ const ph=(t*0.9)%1; const r=1+ph*6.5; const a=1-ph; this.ring(c,cx,cy,r,`rgba(255,180,60,${a*0.8})`,S,1.3); this.disc(c,cx,cy,Math.max(0.5,(0.6-ph)*7),`rgba(255,240,180,${a})`,S); this.disc(c,cx,cy,Math.max(0.2,(0.5-ph)*9),`rgba(255,120,40,${a*0.9})`,S); for(let k=0;k<6;k++){ const a2=k*Math.PI/3+ph; const dx=Math.cos(a2)*r, dy=Math.sin(a2)*r; this.p(c,cx+dx,cy+dy,0.8,0.8,`rgba(80,70,70,${a})`,S);} }
+    else if(id==='gather_fx'){ this.p(c,cx-1,11,3,3,'#6e4a2a',S); this.p(c,cx-1,11,3,0.7,'#8a6038',S); for(let k=0;k<4;k++){ const ph=((t*1.4)+k*0.25)%1; const dx=Math.cos(k*1.6)*ph*5; const dy=-ph*5+ph*ph*4; this.p(c,cx+dx,7+dy,0.9,0.9,`rgba(180,120,60,${1-ph})`,S);} }
+    else if(id==='build_fx'){ const ph=(t*0.6)%1; const h=ph*7; this.p(c,cx-3,13-h,6,h,'#d8c08a',S); this.p(c,cx-3,13-h,6,0.7,'#ecd6a8',S); for(let k=0;k<5;k++){ const pp=((t*1.2)+k*0.2)%1; this.disc(c,cx-3+ (k*1.6), 13+0.5, 0.6+pp*1.2, `rgba(200,190,170,${(1-pp)*0.5})`,S);} this.p(c,cx-4,13,8,0.8,'#5e636d',S); }
+  }
+
+  // ---------- engine ----------
+  ease(x){ return x<0.5? 2*x*x : 1-Math.pow(-2*x+2,2)/2; }
+
+  componentDidMount(){
+    this.t0 = performance.now();
+    this.acc = 0; this.last = this.t0;
+    const loop = (now)=>{
+      this.raf = requestAnimationFrame(loop);
+      if(!this.rootEl) return;
+      if(!this.state.paused){ this.acc += (now - this.last)/1000; }
+      this.last = now;
+      const t = this.acc;
+      const team = this.state.team;
+      const cs = this.rootEl.querySelectorAll('canvas[data-sprite]');
+      cs.forEach(cv=>{
+        const id = cv.dataset.sprite, anim = cv.dataset.anim;
+        if(!id) return;
+        const ctx = cv.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0,0,cv.width,cv.height);
+        const S = parseFloat(cv.dataset.s)||6;
+        let a = anim;
+        if(anim==='cycle'){ a = this.cycleAnim(t, id); }
+        try{
+          if(id==='tank') this.drawTank(ctx,S,t,team,a==='cycle'?'idle':a);
+          else if(['worker','rifleman','sniper','rpg'].includes(id)) this.drawHumanoid(ctx,S,t,team,id,a);
+          else if(this.isBuilding(id)) this.drawBuilding(ctx,S,t,team,id);
+          else if(this.isTile(id)) this.drawTile(ctx,S,t,id);
+          else this.drawEffect(ctx,S,t,id);
+        }catch(err){ /* keep loop alive */ }
+      });
+    };
+    this.raf = requestAnimationFrame(loop);
+  }
+  componentWillUnmount(){ if(this.raf) cancelAnimationFrame(this.raf); }
+
+  isBuilding(id){ return ['city_hall','house','greenhouse','bank','barracks','factory','turret'].includes(id); }
+  isTile(id){ return ['grass','water','bridge','forest','stone'].includes(id); }
+  cycleAnim(t, id){
+    const isWorker = id==='worker';
+    const seq = isWorker ? [['idle',1.1],['walk',1.7],['gather',1.6],['build',1.6]] : [['idle',1.1],['walk',1.7],['attack',1.5],['death',2.6]];
+    const total = seq.reduce((a,b)=>a+b[1],0);
+    let x = t % total;
+    for(const [name,dur] of seq){ if(x<dur) return name; x-=dur; }
+    return 'idle';
+  }
+}
+</script>
+</body>
+</html>

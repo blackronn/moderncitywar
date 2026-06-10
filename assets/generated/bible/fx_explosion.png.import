@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c8w5lc1md65c"
-path="res://.godot/imported/medic_p2.png-5b9fbca22ad719513a0fcccda58e350e.ctex"
+uid="uid://btnpu8a6lwc8x"
+path="res://.godot/imported/fx_explosion.png-8054b01a9572f266687e18419abd78b8.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/generated/medic_p2.png"
-dest_files=["res://.godot/imported/medic_p2.png-5b9fbca22ad719513a0fcccda58e350e.ctex"]
+source_file="res://assets/generated/bible/fx_explosion.png"
+dest_files=["res://.godot/imported/fx_explosion.png-8054b01a9572f266687e18419abd78b8.ctex"]
 
 [params]
 
