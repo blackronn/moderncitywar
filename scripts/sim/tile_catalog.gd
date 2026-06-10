@@ -33,6 +33,8 @@ const BUILDING_COL := {
 	&"house": 8,        # ikiz apartman
 	&"greenhouse": 9,   # genis cam cepheli bina
 	&"bank": 10,        # sutunlu klasik bina
+	&"lumber_camp": 15, # arac kapili depo (kereste deposu)
+	&"quarry": 12,      # vincli/kuleli yapi (tas ocagi)
 	&"barracks": 13,    # bayrak direkli askeri kule
 	&"factory": 11,     # testere catili fabrika
 }
@@ -115,6 +117,8 @@ static func unit_texture(def_id: StringName, pid: int) -> Texture2D:
 		&"sniper":
 			# oyuna ozel uretilmis sprite (tools/gen_sprites.gd)
 			return load("res://assets/generated/sniper_p%d.png" % pid) as Texture2D
+		&"healer":
+			return load("res://assets/generated/medic_p%d.png" % pid) as Texture2D
 		&"rpg":
 			return atlas(BATTLE, Vector2i(SOLDIER_HEAVY_COL, VEHICLE_BAND[pid]))
 		&"tank":

@@ -9,10 +9,28 @@ func run() -> Array:
 	errs.append_array(D.validate())
 	if D.defs_hash() != D.defs_hash():
 		errs.append("defs_hash kararsiz")
-	if D.UNITS.size() != 5:
-		errs.append("5 birim bekleniyordu, %d var" % D.UNITS.size())
-	if D.BUILDINGS.size() != 7:
-		errs.append("7 bina bekleniyordu, %d var" % D.BUILDINGS.size())
+	if D.UNITS.size() != 6:
+		errs.append("6 birim bekleniyordu, %d var" % D.UNITS.size())
+	if D.BUILDINGS.size() != 9:
+		errs.append("9 bina bekleniyordu, %d var" % D.BUILDINGS.size())
+	# gelistirme alanlari tutarli mi
+	for bid: StringName in D.BUILDINGS:
+		var b: Dictionary = D.BUILDINGS[bid]
+		if b.has("up_cost"):
+			var has_benefit: bool = b.has("up_pop") or b.has("up_rate") \
+				or b.has("up_dmg") or b.has("up_speed")
+			if not has_benefit:
+				errs.append("building %s: up_cost var ama kazanim alani yok" % bid)
+	# healer sagligi
+	var healer := D.unit(&"healer")
+	if healer.get("heal_rate", 0.0) <= 0.0:
+		errs.append("healer heal_rate > 0 olmali")
+	if healer.get("dmg", 1) != 0:
+		errs.append("healer hasar vermemeli")
+	# scaled_cost: L2 = 1x, L3 = 2x
+	var sc := D.scaled_cost({"wood": 40, "stone": 20}, 2)
+	if sc["wood"] != 80 or sc["stone"] != 40:
+		errs.append("scaled_cost x2 yanlis")
 	if D.SNIPER_VS_INFANTRY <= 1.0:
 		errs.append("SNIPER_VS_INFANTRY > 1 olmali")
 	if D.RPG_VS_ARMOR_BUILDING <= 1.0:

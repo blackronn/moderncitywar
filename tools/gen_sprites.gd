@@ -24,6 +24,26 @@ const SNIPER := [
 	"................",
 ]
 
+# Sihhiyeci: beyaz uniforma + kirmizi hac; W=beyaz, C=hac, A=takim kol bandi
+const MEDIC := [
+	"................",
+	"................",
+	".....ooo........",
+	"....oWCWo.......",
+	"....oWfWo.......",
+	"....ooooo.......",
+	"...oWWWWWo......",
+	"..oAWCCCWAo.....",
+	"..oW.WCW.Wo.....",
+	"..oW.WWW.Wo.....",
+	"...oWWWWWo......",
+	"...oWW.WWo......",
+	"...oW...Wo......",
+	"...oB...Bo......",
+	"...oo...oo......",
+	"................",
+]
+
 const PALETTES := {
 	1: {
 		"o": Color8(26, 32, 26),
@@ -33,6 +53,8 @@ const PALETTES := {
 		"A": Color8(150, 170, 90),
 		"r": Color8(58, 56, 50),
 		"B": Color8(40, 46, 40),
+		"W": Color8(228, 228, 220),
+		"C": Color8(200, 44, 44),
 	},
 	2: {
 		"o": Color8(34, 26, 26),
@@ -42,6 +64,8 @@ const PALETTES := {
 		"A": Color8(192, 122, 92),
 		"r": Color8(58, 56, 50),
 		"B": Color8(48, 40, 40),
+		"W": Color8(228, 228, 220),
+		"C": Color8(200, 44, 44),
 	},
 }
 
@@ -49,13 +73,15 @@ const PALETTES := {
 func _initialize() -> void:
 	var root := ProjectSettings.globalize_path("res://")
 	DirAccess.make_dir_recursive_absolute(root + "assets/generated")
-	for pid in [1, 2]:
-		var img := _render(SNIPER, PALETTES[pid])
-		var err := img.save_png(root + "assets/generated/sniper_p%d.png" % pid)
-		if err != OK:
-			push_error("sniper_p%d.png yazilamadi" % pid)
-			quit(1)
-			return
+	var jobs := {"sniper": SNIPER, "medic": MEDIC}
+	for sprite_name: String in jobs:
+		for pid in [1, 2]:
+			var img := _render(jobs[sprite_name], PALETTES[pid])
+			var err := img.save_png(root + "assets/generated/%s_p%d.png" % [sprite_name, pid])
+			if err != OK:
+				push_error("%s_p%d.png yazilamadi" % [sprite_name, pid])
+				quit(1)
+				return
 	print("GEN_OK")
 	quit(0)
 

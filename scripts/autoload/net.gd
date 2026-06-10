@@ -203,6 +203,20 @@ func send_build(def_id: StringName, cell: Vector2i, builder_ids: PackedInt32Arra
 		cmd_build.rpc_id(1, def_id, cell, builder_ids)
 
 
+func send_assign_build(ids: PackedInt32Array, building_id: int) -> void:
+	if is_host():
+		if sim != null: sim.handle_assign_build(1, ids, building_id)
+	else:
+		cmd_assign_build.rpc_id(1, ids, building_id)
+
+
+func send_upgrade(building_id: int) -> void:
+	if is_host():
+		if sim != null: sim.handle_upgrade(1, building_id)
+	else:
+		cmd_upgrade.rpc_id(1, building_id)
+
+
 func send_train(building_id: int, def_id: StringName) -> void:
 	if is_host():
 		if sim != null: sim.handle_train(1, building_id, def_id)
@@ -247,6 +261,18 @@ func cmd_gather(ids: PackedInt32Array, cell: Vector2i) -> void:
 func cmd_build(def_id: StringName, cell: Vector2i, builder_ids: PackedInt32Array) -> void:
 	if _cmd_pid() == 2 and sim != null:
 		sim.handle_build(2, def_id, cell, builder_ids)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func cmd_assign_build(ids: PackedInt32Array, building_id: int) -> void:
+	if _cmd_pid() == 2 and sim != null:
+		sim.handle_assign_build(2, ids, building_id)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func cmd_upgrade(building_id: int) -> void:
+	if _cmd_pid() == 2 and sim != null:
+		sim.handle_upgrade(2, building_id)
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -407,9 +433,15 @@ func _apply_event(kind: int, args: Array) -> void:
 		D.Ev.TRACER:
 			var scene := get_tree().current_scene
 			if scene != null and scene.has_method("show_tracer"):
-				scene.show_tracer(args[0], args[1])
+				scene.show_tracer(args[0], args[1], args[2] if args.size() > 2 else 0)
 		D.Ev.TOAST_KEY:
 			Bus.toast.emit(Tr.t(args[0]))
+		D.Ev.LEVEL:
+			var node: Node = GameState.entities.get(args[0])
+			if node != null:
+				node.level = args[1]
+				node.queue_redraw()
+				Bus.entity_level_changed.emit(args[0])
 
 
 func _apply_game_over(winner: int, reason: int) -> void:

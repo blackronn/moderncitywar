@@ -10,7 +10,6 @@ const TIMEOUT_S := 110.0
 
 var scenario := "war"
 var _finished := false
-var _peace_reject := false
 
 
 func _ready() -> void:
@@ -19,7 +18,6 @@ func _ready() -> void:
 			scenario = arg.get_slice("=", 1)
 	get_tree().create_timer(TIMEOUT_S).timeout.connect(_fail)
 	Bus.game_over.connect(_on_over)
-	Bus.build_rejected.connect(_on_reject)
 	if GameState.match_running:
 		_run()
 	else:
@@ -54,30 +52,12 @@ func _run_war() -> void:
 	var ids := PackedInt32Array()
 	for u in _army():
 		ids.append(u.id)
-
-	# 1) baris reddi
-	Net.send_attack(ids, hall.id)
-	var waited := 0.0
-	while not _finished and not _peace_reject and waited < 10.0:
-		await get_tree().create_timer(0.25).timeout
-		waited += 0.25
-	if _finished:
-		return
-	if not _peace_reject:
-		printerr("SMOKE_FAIL_CLIENT baris reddi gelmedi")
-		_fail()
-		return
-	print("BOT_CLIENT baris reddi OK")
-
-	# 2) savas ilani + geri sayim
-	Net.send_declare_war()
+	# ilan mekanigi yok: mac savas halinde baslar, dogrudan saldir
 	while not _finished and GameState.war_state != D.War.WAR:
 		await get_tree().create_timer(0.25).timeout
 	if _finished:
 		return
-	print("BOT_CLIENT savas basladi")
-
-	# 3) saldiri; sonucu _on_over dogrular
+	print("BOT_CLIENT saldiri basliyor")
 	Net.send_attack(ids, hall.id)
 
 
@@ -94,11 +74,6 @@ func _enemy_hall() -> Node:
 		if e.owner_pid == 1 and e.def_id == &"city_hall":
 			return e
 	return null
-
-
-func _on_reject(reason: int) -> void:
-	if reason == D.Reject.PEACE:
-		_peace_reject = true
 
 
 func _on_over(winner: int, reason: int) -> void:

@@ -35,9 +35,13 @@ const TRAIN_QUEUE_MAX := 5
 enum Tile { GRASS, WATER, BRIDGE, FOREST, STONE }
 enum Klass { INFANTRY, ARMOR, BUILDING }
 enum War { PEACE, COUNTDOWN, WAR }
-enum Ev { MATCH_STARTED, WAR_STATE, DEPLETED, BUILD_REJECTED, TRACER, TOAST_KEY }
+enum MapType { RIVER, LAKE, PLAINS }
+enum Ev { MATCH_STARTED, WAR_STATE, DEPLETED, BUILD_REJECTED, TRACER, TOAST_KEY, LEVEL }
 enum Reason { DESTRUCTION, METROPOLIS, OPPONENT_LEFT }
-enum Reject { NO_RES, BAD_SPOT, TOO_FAR, POP_FULL, BLOCKED, QUEUE_FULL, PEACE, INVALID }
+enum Reject { NO_RES, BAD_SPOT, TOO_FAR, POP_FULL, BLOCKED, QUEUE_FULL, PEACE, INVALID, MAX_LEVEL }
+
+# bina gelistirme
+const MAX_LEVEL := 3
 
 # snapshot bayraklari
 const FLAG_MOVING := 1
@@ -45,6 +49,7 @@ const FLAG_ATTACKING := 2
 const FLAG_GATHERING := 4
 const FLAG_CONSTRUCTING := 8
 const FLAG_PRODUCING := 16
+const FLAG_HEALING := 32
 
 # hangi tile hangi kaynagi verir + saniyelik toplama hizi
 const TILE_RES := {Tile.FOREST: "wood", Tile.STONE: "stone"}
@@ -73,10 +78,17 @@ const UNITS := {
 		"cost": {"money": 150, "stone": 80}, "hp": 450, "dmg": 24, "range_t": 4.0, "cooldown_s": 2.0,
 		"speed_t": 1.4, "pop": 3, "klass": Klass.ARMOR, "train_s": 15.0, "aggro_t": 5.0,
 	},
+	&"healer": {
+		"cost": {"food": 50, "money": 30}, "hp": 70, "dmg": 0, "range_t": 2.5, "cooldown_s": 0.0,
+		"speed_t": 2.3, "pop": 1, "klass": Klass.INFANTRY, "train_s": 10.0, "aggro_t": 6.0,
+		"heal_rate": 4.0,   # hp/sn; hasarli dost birim/binalari kendiliginden iyilestirir
+	},
 }
 
 # --- binalar ---
 # size: tile cinsinden footprint, build_s: 1 isciyle insaat suresi, rate: pasif uretim/sn
+# gelistirme alanlari: up_cost (L2 maliyeti; L3 = 2x), up_pop (+nufus/seviye),
+# up_rate (uretim carpani +%/seviye), up_dmg (+hasar/seviye), up_speed (egitim hizi +%/seviye)
 const BUILDINGS := {
 	&"city_hall": {
 		"cost": {}, "hp": 1500, "size": Vector2i(2, 2), "pop_cap": 5, "build_s": 0.0,
@@ -84,26 +96,42 @@ const BUILDINGS := {
 	},
 	&"house": {
 		"cost": {"wood": 50}, "hp": 300, "size": Vector2i(1, 1), "pop_cap": 4, "build_s": 15.0,
+		"up_cost": {"wood": 40, "stone": 20}, "up_pop": 2,
 	},
 	&"greenhouse": {
 		"cost": {"wood": 60}, "hp": 250, "size": Vector2i(1, 1), "build_s": 15.0,
 		"rate": {"food": 0.5},
+		"up_cost": {"wood": 50, "money": 20}, "up_rate": 0.5,
 	},
 	&"bank": {
 		"cost": {"wood": 80, "stone": 40}, "hp": 400, "size": Vector2i(1, 1), "build_s": 20.0,
 		"rate": {"money": 0.4},
+		"up_cost": {"wood": 60, "stone": 30}, "up_rate": 0.5,
+	},
+	&"lumber_camp": {
+		"cost": {"wood": 40, "money": 20}, "hp": 350, "size": Vector2i(1, 1), "build_s": 18.0,
+		"rate": {"wood": 0.4},
+		"up_cost": {"money": 40}, "up_rate": 0.5,
+	},
+	&"quarry": {
+		"cost": {"wood": 60, "money": 20}, "hp": 400, "size": Vector2i(1, 1), "build_s": 20.0,
+		"rate": {"stone": 0.3},
+		"up_cost": {"money": 50}, "up_rate": 0.5,
 	},
 	&"barracks": {
 		"cost": {"wood": 100, "stone": 50}, "hp": 600, "size": Vector2i(2, 2), "build_s": 25.0,
-		"trains": [&"rifleman", &"sniper", &"rpg"],
+		"trains": [&"rifleman", &"sniper", &"rpg", &"healer"],
+		"up_cost": {"wood": 80, "stone": 40}, "up_speed": 0.15,
 	},
 	&"factory": {
 		"cost": {"wood": 120, "stone": 100, "money": 100}, "hp": 800, "size": Vector2i(2, 2), "build_s": 35.0,
 		"trains": [&"tank"],
+		"up_cost": {"wood": 100, "stone": 60}, "up_speed": 0.15,
 	},
 	&"turret": {
 		"cost": {"stone": 60, "money": 40}, "hp": 500, "size": Vector2i(1, 1), "build_s": 20.0,
 		"dmg": 15, "range_t": 5.0, "cooldown_s": 1.2,
+		"up_cost": {"stone": 50, "money": 30}, "up_dmg": 5,
 	},
 }
 
@@ -141,6 +169,14 @@ static func is_building(id: StringName) -> bool:
 static func defs_hash() -> int:
 	## Iki uctaki build'lerin ayni dengeyle calistigini dogrulamak icin.
 	return hash([VERSION, UNITS, BUILDINGS, DMG_MATRIX, START_RES])
+
+
+static func scaled_cost(cost: Dictionary, mult: int) -> Dictionary:
+	## Gelistirme maliyeti: L2 = up_cost, L3 = 2x up_cost (mult = mevcut seviye).
+	var out := {}
+	for kind in cost:
+		out[kind] = int(cost[kind]) * mult
+	return out
 
 
 static func validate() -> Array:

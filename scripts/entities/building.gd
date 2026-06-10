@@ -14,6 +14,7 @@ var hp := 0.0
 var max_hp := 0.0
 var flags := 0
 var construction := 1.0
+var level := 1                       # gelistirme seviyesi (1..D.MAX_LEVEL)
 
 # --- sim alanlari (host) ---
 var cell := Vector2i(-1, -1)         # footprint sol-ust
@@ -115,6 +116,9 @@ func _draw() -> void:
 	var half := Vector2(size) * D.TILE / 2.0
 	if selected:
 		draw_rect(Rect2(-half, Vector2(size) * D.TILE), Color(1, 1, 1, 0.85), false, 1.0)
+	# gelistirme seviyesi: sol-ust kosede altin pip'ler (L2 = 1, L3 = 2)
+	for i in range(level - 1):
+		draw_rect(Rect2(-half.x + 1.0 + i * 4.0, -half.y + 1.0, 3.0, 3.0), Color(0.95, 0.82, 0.3))
 	# can / ilerleme cubugu
 	var frac := hp / max_hp
 	var show_bar := frac < 1.0 or not is_complete() or (flags & D.FLAG_PRODUCING) or not queue.is_empty()

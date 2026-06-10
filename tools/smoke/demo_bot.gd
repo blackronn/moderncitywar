@@ -21,6 +21,8 @@ func _go() -> void:
 		&"house": Vector2i(4, 0),
 		&"greenhouse": Vector2i(4, 2),
 		&"bank": Vector2i(6, 0),
+		&"lumber_camp": Vector2i(6, 2),
+		&"quarry": Vector2i(2, 2),
 		&"barracks": Vector2i(4, 4),
 		&"factory": Vector2i(0, 4),
 		&"turret": Vector2i(6, 5),
@@ -32,9 +34,15 @@ func _go() -> void:
 		&"sniper": Vector2i(-1, 5),
 		&"rpg": Vector2i(-2, 5),
 		&"tank": Vector2i(-3, 2),
+		&"healer": Vector2i(-4, 3),
 	}
 	for uid: StringName in u_offsets:
 		sim.spawn_unit(uid, 1, sim.cell_center(tl + u_offsets[uid]))
+	# gelistirme gorseli: bir ev L2 olsun (altin pip + panel etiketi)
+	for e in GameState.entities.values():
+		if e.owner_pid == 1 and e.def_id == &"house":
+			sim.handle_upgrade(1, e.id)
+			break
 	# catisma onizlemesi: kuzeyden yaklasan dusman mangasi + dogrudan savas hali
 	sim.spawn_unit(&"rifleman", 2, sim.cell_center(tl + Vector2i(4, -4)))
 	sim.spawn_unit(&"rifleman", 2, sim.cell_center(tl + Vector2i(5, -3)))

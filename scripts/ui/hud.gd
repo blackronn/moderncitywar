@@ -5,8 +5,10 @@ extends Control
 const D := preload("res://scripts/autoload/defs.gd")
 const FONT := preload("res://assets/fonts/PublicPixel.ttf")
 
-const BUILDABLE: Array[StringName] = [&"house", &"greenhouse", &"bank", &"barracks", &"factory", &"turret"]
-const RES_SHORT := {"wood": "O", "stone": "T", "food": "Y", "money": "P"}
+const BUILDABLE: Array[StringName] = [
+	&"house", &"greenhouse", &"bank", &"lumber_camp", &"quarry",
+	&"barracks", &"factory", &"turret",
+]
 
 var game: Node2D = null
 var input_ctrl: Node = null
@@ -14,8 +16,7 @@ var input_ctrl: Node = null
 var res_labels := {}
 var pop_label: Label
 var metro_label: Label
-var war_label: Label
-var war_btn: Button
+var map_label: Label
 var toasts: VBoxContainer
 var bottom: PanelContainer
 var sel_label: Label
@@ -55,17 +56,12 @@ func _ready() -> void:
 	var stretch := Control.new()
 	stretch.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.add_child(stretch)
-	war_btn = Button.new()
-	war_btn.text = Tr.t(&"declare_war")
-	war_btn.add_theme_font_override("font", FONT)
-	war_btn.add_theme_font_size_override("font_size", 8)
-	war_btn.modulate = Color(1.0, 0.75, 0.7)
-	war_btn.pressed.connect(Net.send_declare_war)
-	bar.add_child(war_btn)
-	war_label = _mk_label(10)
-	war_label.text = Tr.t(&"peace")
-	war_label.modulate = Color(0.6, 0.95, 0.6)
-	bar.add_child(war_label)
+	# savas ilani kalkti (her an saldirilabilir); sag ust artik harita adini gosterir
+	var map_keys: Array[StringName] = [&"map_river", &"map_lake", &"map_plains"]
+	map_label = _mk_label(10)
+	map_label.text = Tr.t(&"map_label") % Tr.t(map_keys[GameState.map_type])
+	map_label.modulate = Color(1, 1, 1, 0.7)
+	bar.add_child(map_label)
 
 	# --- toast akisi ---
 	toasts = VBoxContainer.new()
@@ -125,22 +121,24 @@ func _ready() -> void:
 	end_box.add_child(menu_btn)
 
 	Bus.resources_changed.connect(_on_res)
-	Bus.war_changed.connect(_on_war)
 	Bus.toast.connect(_toast)
 	Bus.game_over.connect(_on_game_over)
 	Bus.selection_changed.connect(_on_sel)
 	Bus.build_rejected.connect(_on_reject)
+	Bus.entity_level_changed.connect(_on_level_changed)
 	_on_res(GameState.my_pid)
 
 
 func _process(dt: float) -> void:
-	if GameState.war_state == D.War.COUNTDOWN:
-		GameState.war_t_left = maxf(0.0, GameState.war_t_left - dt)
-		war_label.text = Tr.t(&"war_countdown") % int(ceilf(GameState.war_t_left))
 	_refresh_t += dt
 	if _refresh_t >= 0.25:
 		_refresh_t = 0.0
 		_refresh_queue()
+
+
+func _on_level_changed(id: int) -> void:
+	if id in _sel:
+		_refresh_panel()
 
 
 func _fit_viewport() -> void:
@@ -156,10 +154,11 @@ func _mk_label(font_size: int) -> Label:
 
 
 func _cost_str(cost: Dictionary) -> String:
+	## Maliyeti tam kaynak adlariyla yazar: "50 Odun, 40 Taş"
 	var parts: Array[String] = []
 	for kind in cost:
-		parts.append("%d%s" % [cost[kind], RES_SHORT[kind]])
-	return " ".join(parts)
+		parts.append("%d %s" % [cost[kind], Tr.t(StringName(kind))])
+	return ", ".join(parts)
 
 
 # === ust bar ===
@@ -181,19 +180,6 @@ func _on_res(pid: int) -> void:
 	metro_label.text = Tr.t(&"metro_short") % [
 		GameState.pop_used[GameState.my_pid], D.METROPOLIS_POP, have.size(), D.BUILDINGS.size()
 	]
-
-
-func _on_war(state: int, _t_left: float) -> void:
-	war_btn.visible = state == D.War.PEACE
-	match state:
-		D.War.PEACE:
-			war_label.text = Tr.t(&"peace")
-			war_label.modulate = Color(0.6, 0.95, 0.6)
-		D.War.COUNTDOWN:
-			war_label.modulate = Color(1.0, 0.8, 0.3)
-		D.War.WAR:
-			war_label.text = Tr.t(&"at_war")
-			war_label.modulate = Color(1.0, 0.35, 0.3)
 
 
 # === alt panel ===
@@ -227,6 +213,9 @@ func _refresh_panel() -> void:
 
 	if units.size() > 1:
 		sel_label.text = Tr.t(&"n_units") % units.size()
+	elif first.def.has("size"):
+		var lvl_txt := " L%d" % first.level if first.level > 1 else ""
+		sel_label.text = "%s%s  %d/%d" % [Tr.t(first.def_id), lvl_txt, int(first.hp), int(first.max_hp)]
 	else:
 		sel_label.text = "%s  %d/%d" % [Tr.t(first.def_id), int(first.hp), int(first.max_hp)]
 
@@ -237,16 +226,46 @@ func _refresh_panel() -> void:
 			btn.pressed.connect(input_ctrl.start_placement.bind(bid))
 			action_box.add_child(btn)
 	elif units.is_empty() and first.def.has("size") and first.owner_pid == GameState.my_pid \
-			and first.is_complete() and first.def.has("trains"):
-		for uid: StringName in first.def["trains"]:
-			var udef := D.unit(uid)
-			var btn := _action_btn("%s\n%s" % [Tr.t(uid), _cost_str(udef["cost"])])
-			btn.pressed.connect(Net.send_train.bind(first.id, uid))
-			action_box.add_child(btn)
-		var cancel := _action_btn(Tr.t(&"cancel"))
-		cancel.pressed.connect(Net.send_cancel_train.bind(first.id, 0))
-		action_box.add_child(cancel)
+			and first.is_complete():
+		if first.def.has("trains"):
+			for uid: StringName in first.def["trains"]:
+				var udef := D.unit(uid)
+				var btn := _action_btn("%s\n%s\n%s" % [Tr.t(uid), _cost_str(udef["cost"]), _stat_str(udef)])
+				btn.pressed.connect(Net.send_train.bind(first.id, uid))
+				action_box.add_child(btn)
+			var cancel := _action_btn(Tr.t(&"cancel"))
+			cancel.pressed.connect(Net.send_cancel_train.bind(first.id, 0))
+			action_box.add_child(cancel)
+		# gelistirme: maliyet + ne kazanacagi acikca yazilir
+		if first.def.has("up_cost") and first.level < D.MAX_LEVEL:
+			var up_cost := D.scaled_cost(first.def["up_cost"], first.level)
+			var up := _action_btn("%s L%d\n%s\n%s" % [
+				Tr.t(&"upgrade"), first.level + 1, _cost_str(up_cost), _benefit_str(first.def)])
+			up.modulate = Color(0.85, 1.0, 0.85)
+			up.pressed.connect(Net.send_upgrade.bind(first.id))
+			action_box.add_child(up)
 		_refresh_queue()
+
+
+func _stat_str(udef: Dictionary) -> String:
+	## Uretim butonunda birimin cani/hasari gorunsun
+	if udef.has("heal_rate"):
+		return "%s %d, %s" % [Tr.t(&"hp_short"), udef["hp"], Tr.t(&"heals_label")]
+	if udef.get("dmg", 0) <= 0:
+		return "%s %d" % [Tr.t(&"hp_short"), udef["hp"]]
+	return "%s %d, %s %d" % [Tr.t(&"hp_short"), udef["hp"], Tr.t(&"dmg_short"), udef["dmg"]]
+
+
+func _benefit_str(bdef: Dictionary) -> String:
+	if bdef.has("up_pop"):
+		return Tr.t(&"benefit_pop") % int(bdef["up_pop"])
+	if bdef.has("up_rate"):
+		return Tr.t(&"benefit_rate") % int(bdef["up_rate"] * 100.0)
+	if bdef.has("up_dmg"):
+		return Tr.t(&"benefit_dmg") % int(bdef["up_dmg"])
+	if bdef.has("up_speed"):
+		return Tr.t(&"benefit_speed") % int(bdef["up_speed"] * 100.0)
+	return ""
 
 
 func _action_btn(text: String) -> Button:
@@ -254,7 +273,7 @@ func _action_btn(text: String) -> Button:
 	b.text = text
 	b.add_theme_font_override("font", FONT)
 	b.add_theme_font_size_override("font_size", 8)
-	b.custom_minimum_size = Vector2(110, 46)
+	b.custom_minimum_size = Vector2(150, 56)
 	return b
 
 
@@ -290,6 +309,7 @@ func _on_reject(reason: int) -> void:
 		D.Reject.BLOCKED: key = &"reject_blocked"
 		D.Reject.QUEUE_FULL: key = &"reject_queue_full"
 		D.Reject.PEACE: key = &"reject_peace"
+		D.Reject.MAX_LEVEL: key = &"reject_max_level"
 		_: key = &"reject_bad_spot"
 	_toast(Tr.t(key))
 

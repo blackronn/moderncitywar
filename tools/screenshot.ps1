@@ -16,12 +16,15 @@ $out = $OutFile
 if (-not [System.IO.Path]::IsPathRooted($out)) { $out = Join-Path $root $OutFile }
 New-Item -ItemType Directory -Force (Split-Path $out -Parent) | Out-Null
 
-$flags = switch ($Mode) {
-    'menu'    { @() }
-    'preview' { @('--preview') }
-    'demo'    { @('--demo') }
-    'end'     { @('--preview', '--end') }
-}
-& $bin --path $root -- @flags "--screenshot=$out"
+# @( ) sarmasi sart: PS 5.1 switch ciktisini tek elemanda skalere indirger,
+# splat de onu yutar — bayraklar Godot'a hic ulasmaz
+$flags = @(switch ($Mode) {
+    'menu'    { }
+    'preview' { '--preview' }
+    'demo'    { '--demo' }
+    'end'     { '--preview'; '--end' }
+})
+$gargs = @('--path', $root, '--') + $flags + @("--screenshot=$out")
+& $bin @gargs
 if ($LASTEXITCODE -ne 0) { Write-Host "Screenshot basarisiz (exit $LASTEXITCODE)"; exit 1 }
 Write-Host "Kaydedildi: $out"

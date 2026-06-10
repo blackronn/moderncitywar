@@ -11,44 +11,60 @@ static func generate(seed_v: int) -> Dictionary:
 	var h := D.MAP_H
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_v
+	var map_type := absi(seed_v) % 3   # seed harita tipini de belirler
 
 	var grid := PackedInt32Array()
 	grid.resize(w * h)
 	grid.fill(D.Tile.GRASS)
 
-	var cl := w / 2 - 1    # nehrin sol kolonu (23)
-	var cr := w / 2        # nehrin sag kolonu (24)
-
-	# --- nehir: orta iki kolon + simetrik rastgele genisleme ---
-	for y in h:
-		grid[y * w + cl] = D.Tile.WATER
-		grid[y * w + cr] = D.Tile.WATER
-		if rng.randf() < 0.3:
-			grid[y * w + (cl - 1)] = D.Tile.WATER
-			grid[y * w + (cr + 1)] = D.Tile.WATER
-
-	# --- kopruler: 2-3 adet, aralarinda en az 8 satir ---
-	var bridge_count := 2 + (rng.randi() % 2)
+	var cl := w / 2 - 1    # orta eksenin sol kolonu (23)
+	var cr := w / 2        # orta eksenin sag kolonu (24)
 	var bridge_rows: Array[int] = []
-	var tries := 0
-	while bridge_rows.size() < bridge_count and tries < 200:
-		tries += 1
-		var y := rng.randi_range(6, h - 7)
-		var ok := true
-		for prev in bridge_rows:
-			if absi(y - prev) < 8:
-				ok = false
-				break
-		if ok:
-			bridge_rows.append(y)
-	if bridge_rows.size() < bridge_count:
-		var fallback: Array[int] = [12, 24, 36]
-		bridge_rows.assign(fallback.slice(0, bridge_count))
-	bridge_rows.sort()
-	for y in bridge_rows:
-		for x in range(cl - 1, cr + 2):
-			if grid[y * w + x] == D.Tile.WATER:
-				grid[y * w + x] = D.Tile.BRIDGE
+
+	match map_type:
+		D.MapType.RIVER:
+			# --- nehir: orta iki kolon + simetrik rastgele genisleme ---
+			for y in h:
+				grid[y * w + cl] = D.Tile.WATER
+				grid[y * w + cr] = D.Tile.WATER
+				if rng.randf() < 0.3:
+					grid[y * w + (cl - 1)] = D.Tile.WATER
+					grid[y * w + (cr + 1)] = D.Tile.WATER
+			# --- kopruler: 2-3 adet, aralarinda en az 8 satir ---
+			var bridge_count := 2 + (rng.randi() % 2)
+			var tries := 0
+			while bridge_rows.size() < bridge_count and tries < 200:
+				tries += 1
+				var y := rng.randi_range(6, h - 7)
+				var ok := true
+				for prev in bridge_rows:
+					if absi(y - prev) < 8:
+						ok = false
+						break
+				if ok:
+					bridge_rows.append(y)
+			if bridge_rows.size() < bridge_count:
+				var fallback: Array[int] = [12, 24, 36]
+				bridge_rows.assign(fallback.slice(0, bridge_count))
+			bridge_rows.sort()
+			for y in bridge_rows:
+				for x in range(cl - 1, cr + 2):
+					if grid[y * w + x] == D.Tile.WATER:
+						grid[y * w + x] = D.Tile.BRIDGE
+		D.MapType.LAKE:
+			# --- merkez gol: ust/alt kiyilardan dolasilir, kopru yok ---
+			var rx := 6.0 + rng.randf() * 4.0
+			var ry := 6.0 + rng.randf() * 4.0
+			var cx := (w - 1) / 2.0
+			var cy := (h - 1) / 2.0
+			for y in h:
+				for x in range(0, cl + 1):
+					var dx := (float(x) - cx) / rx
+					var dy := (float(y) - cy) / ry
+					if dx * dx + dy * dy <= 1.0:
+						grid[y * w + x] = D.Tile.WATER
+		D.MapType.PLAINS:
+			pass   # su yok: acik ova, dogrudan cephe
 
 	# --- spawn'lar: belediye 2x2'nin sol-ust kosesi ---
 	var spawn1 := Vector2i(4, h / 2 - 1)
@@ -59,11 +75,13 @@ static func generate(seed_v: int) -> Dictionary:
 	_walk_blob(rng, grid, cl, Vector2i(center1.x + 1, center1.y - 7), D.Tile.FOREST, 12, center1)
 	_walk_blob(rng, grid, cl, Vector2i(center1.x + 1, center1.y + 7), D.Tile.STONE, 7, center1)
 
-	# --- sol yariya dagilmis orman/tas alanlari ---
-	for _i in 7:
+	# --- sol yariya dagilmis orman/tas alanlari (ovada daha bol) ---
+	var forest_blobs := 11 if map_type == D.MapType.PLAINS else 7
+	var stone_blobs := 4 if map_type == D.MapType.PLAINS else 3
+	for _i in forest_blobs:
 		var start := Vector2i(rng.randi_range(1, cl - 2), rng.randi_range(1, h - 2))
 		_walk_blob(rng, grid, cl, start, D.Tile.FOREST, rng.randi_range(6, 14), center1)
-	for _i in 3:
+	for _i in stone_blobs:
 		var start := Vector2i(rng.randi_range(1, cl - 2), rng.randi_range(1, h - 2))
 		_walk_blob(rng, grid, cl, start, D.Tile.STONE, rng.randi_range(3, 6), center1)
 
@@ -76,6 +94,7 @@ static func generate(seed_v: int) -> Dictionary:
 		"grid": grid,
 		"spawns": [spawn1, spawn2],
 		"bridge_rows": bridge_rows,
+		"map_type": map_type,
 		"hash": hash(grid),
 	}
 

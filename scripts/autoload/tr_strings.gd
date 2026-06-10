@@ -36,15 +36,24 @@ const S := {
 	&"sniper": "Nişancı",
 	&"rpg": "RPG'ci",
 	&"tank": "Tank",
+	&"healer": "Sıhhiyeci",
 
 	# binalar
 	&"city_hall": "Belediye Binası",
 	&"house": "Ev",
 	&"greenhouse": "Sera",
 	&"bank": "Banka",
+	&"lumber_camp": "Keresteci",
+	&"quarry": "Taş Ocağı",
 	&"barracks": "Kışla",
 	&"factory": "Fabrika",
 	&"turret": "Taret",
+
+	# haritalar
+	&"map_river": "Nehir",
+	&"map_lake": "Göl",
+	&"map_plains": "Ova",
+	&"map_label": "Harita: %s",
 
 	# savas durumu
 	&"peace": "BARIŞ",
@@ -71,6 +80,17 @@ const S := {
 	&"cancel": "İptal",
 	&"under_construction": "İnşaat halinde",
 	&"queue": "Kuyruk",
+	&"hp_short": "Can",
+	&"dmg_short": "Hasar",
+	&"heals_label": "İyileştirir",
+
+	# gelistirme
+	&"upgrade": "Geliştir",
+	&"benefit_pop": "+%d nüfus",
+	&"benefit_rate": "+%d%% üretim",
+	&"benefit_dmg": "+%d hasar",
+	&"benefit_speed": "%d%% hızlı eğitim",
+	&"reject_max_level": "Bina maksimum seviyede",
 
 	# oyun sonu
 	&"victory": "ZAFER!",

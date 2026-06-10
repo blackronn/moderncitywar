@@ -35,6 +35,7 @@ func _ready() -> void:
 	var gen := MapGen.generate(GameState.seed_v)
 	GameState.grid = gen["grid"]
 	GameState.spawns = gen["spawns"]
+	GameState.map_type = gen["map_type"]
 	GameState.map_hash = gen["hash"]
 
 	var ts := TileCatalog.build_tileset()
@@ -231,10 +232,11 @@ func on_tile_depleted(cell: Vector2i) -> void:
 	features.erase_cell(cell)
 
 
-func show_tracer(from: Vector2, to: Vector2) -> void:
+func show_tracer(from: Vector2, to: Vector2, kind := 0) -> void:
 	var line := Line2D.new()
 	line.points = PackedVector2Array([from, to])
 	line.width = 1.0
-	line.default_color = Color(1.0, 0.95, 0.6, 0.9)
+	# 0 = mermi (sari), 1 = iyilestirme isini (yesil)
+	line.default_color = Color(0.45, 1.0, 0.55, 0.9) if kind == 1 else Color(1.0, 0.95, 0.6, 0.9)
 	fx.add_child(line)
-	get_tree().create_timer(0.1).timeout.connect(line.queue_free)
+	get_tree().create_timer(0.18 if kind == 1 else 0.1).timeout.connect(line.queue_free)

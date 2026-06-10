@@ -142,7 +142,7 @@ func _command(wp: Vector2) -> void:
 			unit_ids.append(id)
 	if unit_ids.is_empty():
 		return
-	# dusman varligina tiklandiysa: savastaysak saldir, degilsek uyar
+	# dusman varligina tiklandiysa: saldir (savas ilani yok, her an serbest)
 	var enemy_id := _pick_enemy(wp)
 	if enemy_id != 0:
 		if GameState.war_state == D.War.WAR:
@@ -150,12 +150,30 @@ func _command(wp: Vector2) -> void:
 		else:
 			Bus.build_rejected.emit(D.Reject.PEACE)
 		return
+	# kendi yarim insaatina tiklandiysa: secili iscileri insaata ata (devam et)
+	var own_b := _pick_own_building(wp)
+	if own_b != null and not own_b.is_complete():
+		var workers := PackedInt32Array()
+		for id in unit_ids:
+			var e: Node = GameState.ent(id)
+			if e != null and e.def_id == &"worker":
+				workers.append(id)
+		if not workers.is_empty():
+			Net.send_assign_build(workers, own_b.id)
+			return
 	var cell := Vector2i((wp / float(D.TILE)).floor())
 	var t := GameState.grid_at(cell)
 	if D.TILE_RES.has(t):
 		Net.send_gather(unit_ids, cell)
 	else:
 		Net.send_move(unit_ids, wp)
+
+
+func _pick_own_building(wp: Vector2) -> Node:
+	for e in GameState.entities.values():
+		if e.owner_pid == GameState.my_pid and e.def.has("size") and e.footprint_px().has_point(wp):
+			return e
+	return null
 
 
 func _pick_enemy(wp: Vector2) -> int:

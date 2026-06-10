@@ -7,6 +7,7 @@ const D := preload("res://scripts/autoload/defs.gd")
 var my_pid := 1                      # 1 = host, 2 = istemci
 var seed_v := 0
 var grid := PackedInt32Array()       # guncel harita (tukenmeler islenmis), D.Tile.*
+var map_type := 0                    # D.MapType.*
 var map_hash := 0
 var spawns: Array = []               # [Vector2i, Vector2i] belediye sol-ust koseleri
 var res := {}                        # pid -> {"wood": float, ...}
@@ -23,6 +24,7 @@ func reset(p_seed: int) -> void:
 	my_pid = my_pid  # pid'i Net yonetir; burada dokunma
 	seed_v = p_seed
 	grid = PackedInt32Array()
+	map_type = 0
 	map_hash = 0
 	spawns = []
 	res = {1: D.START_RES.duplicate(true), 2: D.START_RES.duplicate(true)}

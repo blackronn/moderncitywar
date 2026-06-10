@@ -43,6 +43,9 @@ func start_match() -> void:
 			spawn_unit(&"worker", pid, cell_center(wc))
 	recount_pop()
 	Net.ev(D.Ev.MATCH_STARTED)
+	# baris/ilan mekanigi kaldirildi: mac dogrudan savas halinde baslar,
+	# isteyen istedigi an saldirir
+	Net.ev(D.Ev.WAR_STATE, [D.War.WAR, 0.0])
 	Net.bc_resources(1)
 	Net.bc_resources(2)
 
@@ -56,6 +59,7 @@ func _physics_process(delta: float) -> void:
 	_tick_economy(dt)
 	_tick_units(dt)
 	_tick_combat(dt)
+	_tick_healers(dt)
 	if tick % 15 == 0 and _res_dirty:
 		_res_dirty = false
 		Bus.resources_changed.emit(1)
@@ -146,6 +150,40 @@ func handle_build(pid: int, def_id: StringName, top_left: Vector2i, builders: Pa
 			_assign_build(u, b)
 
 
+func handle_assign_build(pid: int, ids: PackedInt32Array, building_id: int) -> void:
+	## Yarim kalmis kendi insaatina isci atama (sag tikla devam etme).
+	var b: Node = GameState.ent(building_id)
+	if b == null or not b.def.has("size") or b.owner_pid != pid or b.is_complete():
+		return
+	for u in _owned_units(pid, ids):
+		if u.def_id == &"worker":
+			_assign_build(u, b)
+
+
+func handle_upgrade(pid: int, building_id: int) -> void:
+	var b: Node = GameState.ent(building_id)
+	if b == null or not b.def.has("size") or b.owner_pid != pid or not b.is_complete():
+		Net.reject_to(pid, D.Reject.INVALID)
+		return
+	if not b.def.has("up_cost"):
+		Net.reject_to(pid, D.Reject.INVALID)
+		return
+	if b.level >= D.MAX_LEVEL:
+		Net.reject_to(pid, D.Reject.MAX_LEVEL)
+		return
+	var cost := D.scaled_cost(b.def["up_cost"], b.level)
+	if not GameState.can_afford(pid, cost):
+		Net.reject_to(pid, D.Reject.NO_RES)
+		return
+	GameState.pay(pid, cost)
+	_res_dirty = true
+	b.level += 1
+	b.queue_redraw()
+	Net.ev(D.Ev.LEVEL, [b.id, b.level])
+	recount_pop()   # ev gelistirmesi nufus kapasitesini degistirir
+	Net.bc_resources(pid)
+
+
 func handle_train(pid: int, building_id: int, def_id: StringName) -> void:
 	var b: Node = GameState.ent(building_id)
 	if b == null or not b.def.has("size") or b.owner_pid != pid or not b.is_complete():
@@ -169,7 +207,7 @@ func handle_train(pid: int, building_id: int, def_id: StringName) -> void:
 	_res_dirty = true
 	b.queue.append(def_id)
 	if b.queue.size() == 1:
-		b.queue_t = udef["train_s"]
+		b.queue_t = _train_time(b, def_id)
 
 
 func handle_cancel_train(pid: int, building_id: int, index: int) -> void:
@@ -182,7 +220,7 @@ func handle_cancel_train(pid: int, building_id: int, index: int) -> void:
 	_res_dirty = true
 	b.queue.remove_at(index)
 	if index == 0 and not b.queue.is_empty():
-		b.queue_t = D.unit(b.queue[0])["train_s"]
+		b.queue_t = _train_time(b, b.queue[0])
 
 
 func handle_attack(pid: int, ids: PackedInt32Array, target_id: int) -> void:
@@ -271,7 +309,7 @@ func _tick_production(dt: float) -> void:
 		spawn_unit(def_id, b.owner_pid, cell_center(sc))
 		b.queue.pop_front()
 		if not b.queue.is_empty():
-			b.queue_t = D.unit(b.queue[0])["train_s"]
+			b.queue_t = _train_time(b, b.queue[0])
 		recount_pop()
 		_res_dirty = true
 
@@ -281,8 +319,12 @@ func _tick_economy(dt: float) -> void:
 		if not b.is_complete():
 			continue
 		var rate: Dictionary = b.def.get("rate", {})
+		if rate.is_empty():
+			continue
+		# gelistirme: her seviye uretimi up_rate kadar artirir (orn. +%50)
+		var mult := 1.0 + float(b.def.get("up_rate", 0.0)) * float(b.level - 1)
 		for kind in rate:
-			GameState.res[b.owner_pid][kind] += rate[kind] * dt
+			GameState.res[b.owner_pid][kind] += rate[kind] * mult * dt
 			_res_dirty = true
 
 
@@ -320,6 +362,8 @@ func _tick_units(dt: float) -> void:
 					u.flags |= D.FLAG_MOVING
 			&"attack":
 				pass   # hareket + ates _tick_combat'ta
+			&"heal":
+				pass   # hareket + iyilestirme _tick_healers'ta
 	_separate_units()
 	for bid in builders_on:
 		var b: Node = GameState.ent(bid)
@@ -379,6 +423,11 @@ func _combat_step(u: Node, tgt: Node, dt: float) -> void:
 		return
 	# kovala: hedef yer degistirdiyse yeniden yol (15 tick frenli)
 	u.flags |= D.FLAG_MOVING
+	_chase(u, tgt, dt)
+
+
+func _chase(u: Node, tgt: Node, dt: float) -> void:
+	## Hedefe dogru yurur; hedef yer degistirdikce yolu tazeler (frenli).
 	if u.repath_block > 0:
 		u.repath_block -= 1
 	var goal := _cell_of(tgt)
@@ -394,11 +443,70 @@ func _combat_step(u: Node, tgt: Node, dt: float) -> void:
 	_follow(u, dt)
 
 
+func _tick_healers(dt: float) -> void:
+	## Sihhiyeci: bos/iyilestirme gorevindeyken yakindaki hasarli dostu bulur,
+	## menzile yuruyup saniyede heal_rate kadar can doldurur. Savas durumundan
+	## bagimsiz calisir; oyuncunun yuru/saldiri emri her zaman oncelikli.
+	for u in _units():
+		if not u.def.has("heal_rate"):
+			continue
+		var kind: StringName = u.task.get("kind", &"idle")
+		if kind != &"idle" and kind != &"heal":
+			continue
+		var tgt: Node = null
+		if kind == &"heal":
+			tgt = GameState.ent(u.task.get("tid", 0))
+			if tgt == null or tgt.hp >= tgt.max_hp \
+					or (tgt.def.has("size") and not tgt.is_complete()):
+				tgt = null
+				u.task = {"kind": &"idle"}
+		if tgt == null:
+			tgt = _nearest_damaged_friendly(u, u.def["aggro_t"])
+			if tgt != null:
+				u.task = {"kind": &"heal", "tid": tgt.id, "cell": _cell_of(tgt)}
+				u.repath_block = 0
+		if tgt == null:
+			continue
+		if _dist_t(u, tgt) <= float(u.def["range_t"]):
+			u.path.clear()
+			u.path_i = 0
+			u.flags |= D.FLAG_HEALING
+			tgt.set_hp(minf(tgt.max_hp, tgt.hp + u.def["heal_rate"] * dt))
+			var fx_t: float = u.task.get("fx", 0.0) - dt
+			if fx_t <= 0.0:
+				Net.ev(D.Ev.TRACER, [u.position, tgt.position, 1])   # yesil isin
+				fx_t = 0.5
+			u.task["fx"] = fx_t
+		else:
+			u.flags |= D.FLAG_MOVING
+			_chase(u, tgt, dt)
+
+
+func _nearest_damaged_friendly(e: Node, range_t: float) -> Node:
+	var best: Node = null
+	var bd := 1e9
+	for o in GameState.entities.values():
+		if o.owner_pid != e.owner_pid or o == e:
+			continue
+		if o.hp >= o.max_hp:
+			continue
+		if o.def.has("size") and not o.is_complete():
+			continue   # insaat isciden, iyilestirme sihhiyeciden
+		var d := _dist_t(e, o)
+		if d <= range_t and d < bd:
+			bd = d
+			best = o
+	return best
+
+
 func _fire(att: Node, tgt: Node) -> void:
 	att.cooldown = att.def["cooldown_s"]
 	var dmg := attack_damage(att.def_id, att.def, tgt.def_id, tgt.def, _dist_t(att, tgt))
+	# gelistirilmis taret: seviye basina sabit ek hasar
+	if att.def.has("up_dmg"):
+		dmg += float(att.def["up_dmg"]) * float(att.level - 1)
 	tgt.set_hp(tgt.hp - dmg)
-	Net.ev(D.Ev.TRACER, [att.position, tgt.position])
+	Net.ev(D.Ev.TRACER, [att.position, tgt.position, 0])
 	if tgt.hp <= 0.0:
 		_kill(tgt)
 
@@ -651,6 +759,14 @@ func cell_center(c: Vector2i) -> Vector2:
 	return Vector2(c) * D.TILE + Vector2(D.TILE, D.TILE) / 2.0
 
 
+func _train_time(b: Node, def_id: StringName) -> float:
+	## Egitim suresi; gelistirilmis kisla/fabrika seviye basina up_speed kadar hizlanir.
+	var base: float = D.unit(def_id)["train_s"]
+	if b.def.has("up_speed"):
+		base *= maxf(0.4, 1.0 - float(b.def["up_speed"]) * float(b.level - 1))
+	return base
+
+
 func _px_to_cell(p: Vector2) -> Vector2i:
 	return Vector2i(
 		clampi(int(p.x / D.TILE), 0, D.MAP_W - 1),
@@ -707,5 +823,7 @@ func recount_pop() -> void:
 				used += int(e.def["pop"])
 			elif e.is_complete():
 				cap += int(e.def.get("pop_cap", 0))
+				# gelistirilmis ev: seviye basina ek nufus
+				cap += int(e.def.get("up_pop", 0)) * (e.level - 1)
 		GameState.pop_used[pid] = used
 		GameState.pop_cap[pid] = cap

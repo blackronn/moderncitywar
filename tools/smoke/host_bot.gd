@@ -56,6 +56,8 @@ func _build_metropolis(sim: Node) -> void:
 		sim.spawn_building(&"house", 1, tl + o, true)
 	sim.spawn_building(&"greenhouse", 1, tl + Vector2i(0, 4), true)
 	sim.spawn_building(&"bank", 1, tl + Vector2i(2, 4), true)
+	sim.spawn_building(&"lumber_camp", 1, tl + Vector2i(0, 8), true)
+	sim.spawn_building(&"quarry", 1, tl + Vector2i(2, 8), true)
 	sim.spawn_building(&"barracks", 1, tl + Vector2i(0, 6), true)
 	sim.spawn_building(&"factory", 1, tl + Vector2i(3, 6), true)
 	sim.spawn_building(&"turret", 1, tl + Vector2i(6, 6), true)
@@ -82,6 +84,9 @@ func _on_over(winner: int, reason: int) -> void:
 			ok = winner == 1 and reason == D.Reason.METROPOLIS
 	if ok:
 		print("SMOKE_PASS_HOST")
+		# sv_game_over paketinin istemciye ulasmasi icin cikmadan once bekle
+		# (aninda quit ENet kuyrugunu flush etmeden sureci oldurur)
+		await get_tree().create_timer(1.0).timeout
 		get_tree().quit(0)
 	else:
 		printerr("SMOKE_FAIL_HOST yanlis sonuc w=%d r=%d senaryo=%s" % [winner, reason, scenario])
