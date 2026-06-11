@@ -56,6 +56,7 @@ func _build_ui() -> void:
 	box.add_child(_spacer(16.0))
 	box.add_child(_menu_button(Tr.t(&"host_game"), _on_host, UiKit.ACCENT_BLUE))
 	box.add_child(_menu_button(Tr.t(&"join_game"), _on_join, Color.TRANSPARENT))
+	box.add_child(_menu_button(Tr.t(&"single_player"), _on_single, Color.TRANSPARENT))
 	box.add_child(_menu_button(Tr.t(&"quit"), _on_quit, Color.TRANSPARENT))
 	box.add_child(_spacer(8.0))
 
@@ -98,6 +99,15 @@ func _on_host() -> void:
 func _on_join() -> void:
 	LobbyScript.mode = "join"
 	get_tree().change_scene_to_file("res://scenes/lobby.tscn")
+
+
+func _on_single() -> void:
+	## Tek kisilik kesif: ag yok, sim lokal kosar. Karsida hareketsiz bir
+	## rakip sehri olur — istersen savas ilan edip yik, istersen sadece kur.
+	Net.leave()
+	GameState.reset((randi() % 899999) + 100000)
+	GameState.my_pid = 1
+	get_tree().change_scene_to_file("res://scenes/game.tscn")
 
 
 func _on_quit() -> void:

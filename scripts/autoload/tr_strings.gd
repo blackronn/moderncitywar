@@ -8,6 +8,7 @@ const S := {
 	&"subtitle": "İKİ BELEDİYE BAŞKANI · TEK HARİTA",
 	&"host_game": "Oyun Kur",
 	&"join_game": "Oyuna Katıl",
+	&"single_player": "Tek Kişilik (Keşif)",
 	&"quit": "Çıkış",
 	&"back": "Geri",
 	&"connect": "Bağlan",
