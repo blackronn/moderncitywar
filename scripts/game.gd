@@ -150,7 +150,12 @@ func spawn_entity_visual(id: int, def_id: StringName, owner_pid: int, pos: Vecto
 		# footprint sol-ustu pozisyondan turetilir; iki ucta ortak yol
 		var size: Vector2i = node.def["size"]
 		node.cell = Vector2i(((pos - Vector2(size) * D.TILE / 2.0) / D.TILE).round())
-		pathing.set_rect_solid(node.cell, size, true)
+		# kopru ve mayin yuruyusu ENGELLEMEZ (kopru su ustune gecis, mayin gizli)
+		if not node.def.has("bridge") and not node.def.has("mine"):
+			pathing.set_rect_solid(node.cell, size, true)
+		# rakibin mayini bu ekranda gorunmez (host iki tarafi da sim'ler)
+		if node.def.has("mine") and owner_pid != GameState.my_pid:
+			node.visible = false
 	entities.add_child(node)
 	GameState.entities[id] = node
 	Bus.entity_spawned.emit(node)
@@ -161,7 +166,7 @@ func despawn_entity_visual(id: int, reason: int) -> void:
 	var node: Node = GameState.entities.get(id)
 	if node == null:
 		return
-	if node is BuildingScript:
+	if node is BuildingScript and not node.def.has("bridge") and not node.def.has("mine"):
 		pathing.set_rect_solid(node.cell, node.def["size"], false)
 	if reason == 1:
 		_death_visual(node)
@@ -237,20 +242,48 @@ func _ghost_valid(tl: Vector2i, bdef: Dictionary) -> bool:
 	# istemci tarafi ON-kontrol (renk icin); asil dogrulama host'ta
 	if not GameState.can_afford(GameState.my_pid, bdef["cost"]):
 		return false
+	if bdef.has("bridge"):
+		# kopru: su hucresi + yurunebilir komsu
+		if GameState.grid_at(tl) != D.Tile.WATER:
+			return false
+		for off in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			var t := GameState.grid_at(tl + off)
+			if (t != -1 and t != D.Tile.WATER and t != D.Tile.HILL) \
+					or not pathing.is_solid(tl + off):
+				return true
+		return false
 	var size: Vector2i = bdef["size"]
 	for dy in size.y:
 		for dx in size.x:
 			var c := tl + Vector2i(dx, dy)
-			if GameState.grid_at(c) != D.Tile.GRASS:
+			if not D.BUILDABLE_TILES.has(GameState.grid_at(c)):
 				return false
 			if pathing.is_solid(c):
 				return false
+	if bdef.has("mine"):
+		return true   # mayinda sehir yaricapi kurali yok
 	var rect := Rect2i(tl, size)
 	for e in GameState.entities.values():
 		if e.owner_pid == GameState.my_pid and e.def.has("size"):
 			if SimScript._rect_chebyshev(rect, Rect2i(e.cell, e.def["size"])) <= D.BUILD_RADIUS_TILES:
 				return true
 	return false
+
+
+# === mayin suphesi isaretleri (tamamen lokal) ===
+
+var _markers := {}
+
+
+func toggle_marker(cell: Vector2i) -> void:
+	if _markers.has(cell):
+		_markers[cell].queue_free()
+		_markers.erase(cell)
+		return
+	var m: Node2D = preload("res://scripts/marker.gd").new()
+	m.position = Vector2(cell) * D.TILE + Vector2(D.TILE, D.TILE) / 2.0
+	fx.add_child(m)
+	_markers[cell] = m
 
 
 func on_tile_depleted(cell: Vector2i) -> void:

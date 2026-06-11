@@ -9,10 +9,21 @@ func run() -> Array:
 	errs.append_array(D.validate())
 	if D.defs_hash() != D.defs_hash():
 		errs.append("defs_hash kararsiz")
-	if D.UNITS.size() != 6:
-		errs.append("6 birim bekleniyordu, %d var" % D.UNITS.size())
-	if D.BUILDINGS.size() != 9:
-		errs.append("9 bina bekleniyordu, %d var" % D.BUILDINGS.size())
+	if D.UNITS.size() != 9:
+		errs.append("9 birim bekleniyordu, %d var" % D.UNITS.size())
+	if D.BUILDINGS.size() != 11:
+		errs.append("11 bina bekleniyordu, %d var" % D.BUILDINGS.size())
+	if D.metro_types() != 9:
+		errs.append("metro_types 9 olmali (kopru+mayin haric), %d" % D.metro_types())
+	# iska oranlari mantikli araliklarda
+	for uid: StringName in D.UNITS:
+		var m: float = D.UNITS[uid].get("miss", 0.0)
+		if m < 0.0 or m > 0.5:
+			errs.append("unit %s: miss 0..0.5 araliginda olmali" % uid)
+	if D.unit(&"mortar").get("arc", false) != true:
+		errs.append("havanci arc atisli olmali")
+	if D.building(&"mine").get("m_dmg", 0) < 100:
+		errs.append("mayin hasari tank avcisi olacak kadar yuksek olmali")
 	# gelistirme alanlari tutarli mi
 	for bid: StringName in D.BUILDINGS:
 		var b: Dictionary = D.BUILDINGS[bid]

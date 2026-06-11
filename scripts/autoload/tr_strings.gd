@@ -36,6 +36,9 @@ const S := {
 	&"rifleman": "Piyade",
 	&"sniper": "Nişancı",
 	&"rpg": "RPG'ci",
+	&"mg": "Makineli",
+	&"commando": "Komando",
+	&"mortar": "Havancı",
 	&"tank": "Tank",
 	&"healer": "Sıhhiyeci",
 
@@ -44,8 +47,10 @@ const S := {
 	&"house": "Ev",
 	&"greenhouse": "Sera",
 	&"bank": "Banka",
-	&"lumber_camp": "Keresteci",
+	&"lumber_camp": "Kereste Fabrikası",
 	&"quarry": "Taş Ocağı",
+	&"bridge_seg": "Köprü",
+	&"mine": "Mayın",
 	&"barracks": "Kışla",
 	&"factory": "Fabrika",
 	&"turret": "Taret",
@@ -54,6 +59,8 @@ const S := {
 	&"map_river": "Nehir",
 	&"map_lake": "Göl",
 	&"map_plains": "Ova",
+	&"map_snow": "Kar",
+	&"map_valley": "Vadi",
 	&"map_label": "Harita: %s",
 
 	# savas durumu
@@ -94,6 +101,15 @@ const S := {
 	&"benefit_dmg": "+%d hasar",
 	&"benefit_speed": "%d%% hızlı eğitim",
 	&"reject_max_level": "Bina maksimum seviyede",
+	&"demolish": "Yık",
+	&"form_free": "Serbest",
+	&"form_line": "Saf",
+	&"form_wedge": "Kama",
+	&"form_box": "Kutu",
+	&"formation": "Diziliş",
+	&"map_vote": "Harita Oyu",
+	&"random_map": "Rastgele",
+	&"marker_hint": "M: mayın şüphesi işareti koy/kaldır",
 
 	# oyun sonu
 	&"victory": "ZAFER!",

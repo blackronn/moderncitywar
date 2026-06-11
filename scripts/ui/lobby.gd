@@ -9,6 +9,7 @@ const UiKit := preload("res://scripts/ui/ui_kit.gd")
 
 var status: Label
 var ip_edit: LineEdit
+var _vote_buttons := {}
 
 
 func _ready() -> void:
@@ -45,6 +46,29 @@ func _ready() -> void:
 	status.add_theme_font_size_override("font_size", 10)
 	status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(status)
+
+	# --- harita oylamasi: iki oyuncu da oy verir; ayni -> o harita,
+	# --- farkli -> ikisinden rastgele ---
+	var vote_title := Label.new()
+	vote_title.text = Tr.t(&"map_vote")
+	UiKit.label(vote_title, 8, Color(1, 1, 1, 0.5))
+	vote_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(vote_title)
+	var vote_row := HBoxContainer.new()
+	vote_row.add_theme_constant_override("separation", 5)
+	vote_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_child(vote_row)
+	var opts: Array = [
+		[-1, &"random_map"], [0, &"map_river"], [1, &"map_lake"],
+		[2, &"map_plains"], [3, &"map_snow"], [4, &"map_valley"],
+	]
+	for o in opts:
+		var vb := Button.new()
+		vb.text = Tr.t(o[1])
+		UiKit.button(vb, 7, UiKit.ACCENT_BLUE if Net.my_map_vote == o[0] else Color.TRANSPARENT)
+		vb.pressed.connect(_on_vote.bind(o[0]))
+		_vote_buttons[o[0]] = vb
+		vote_row.add_child(vb)
 
 	if mode == "host":
 		status.text = Tr.t(&"waiting_opponent")
@@ -89,6 +113,13 @@ func _local_ips() -> String:
 		if out.size() >= 3:
 			break
 	return ", ".join(out) if not out.is_empty() else "?"
+
+
+func _on_vote(v: int) -> void:
+	Net.my_map_vote = v
+	for key in _vote_buttons:
+		var b: Button = _vote_buttons[key]
+		UiKit.button(b, 7, UiKit.ACCENT_BLUE if key == v else Color.TRANSPARENT)
 
 
 func _set_status(msg: String) -> void:

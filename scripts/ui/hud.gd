@@ -10,10 +10,11 @@ const FONT := preload("res://assets/fonts/PublicPixel.ttf")
 
 const BUILDABLE: Array[StringName] = [
 	&"house", &"greenhouse", &"bank", &"lumber_camp", &"quarry",
-	&"barracks", &"factory", &"turret",
+	&"barracks", &"factory", &"turret", &"bridge_seg", &"mine",
 ]
 const ARMY_TYPES: Array[StringName] = [
-	&"worker", &"rifleman", &"sniper", &"rpg", &"healer", &"tank",
+	&"worker", &"rifleman", &"sniper", &"rpg", &"mg", &"commando",
+	&"mortar", &"healer", &"tank",
 ]
 
 var game: Node2D = null
@@ -28,7 +29,8 @@ var war_btn: Button
 var toasts: VBoxContainer
 var bottom: PanelContainer
 var sel_label: Label
-var action_box: HBoxContainer
+var action_box: HFlowContainer
+var form_box: HBoxContainer
 var queue_label: Label
 var army_panel: PanelContainer
 var army_box: VBoxContainer
@@ -80,7 +82,7 @@ func _ready() -> void:
 	war_label.modulate = Color(0.6, 0.95, 0.6)
 	bar.add_child(war_label)
 	map_label = _mk_label(8)
-	var map_keys: Array[StringName] = [&"map_river", &"map_lake", &"map_plains"]
+	var map_keys: Array[StringName] = [&"map_river", &"map_lake", &"map_plains", &"map_snow", &"map_valley"]
 	map_label.text = Tr.t(&"map_label") % Tr.t(map_keys[GameState.map_type])
 	map_label.modulate = Color(1, 1, 1, 0.5)
 	bar.add_child(map_label)
@@ -98,6 +100,7 @@ func _ready() -> void:
 	army_panel.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
 	army_panel.offset_right = -8.0
 	army_panel.offset_left = -86.0
+	army_panel.grow_vertical = Control.GROW_DIRECTION_BOTH   # ortadan iki yone buyu (tasma fix)
 	army_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	UiKit.panel(army_panel, 10.0, 6.0)
 	add_child(army_panel)
@@ -124,8 +127,8 @@ func _ready() -> void:
 	bottom = PanelContainer.new()
 	bottom.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	bottom.offset_left = 8.0
-	bottom.offset_right = -8.0
-	bottom.offset_top = -76.0
+	bottom.offset_right = -96.0   # sag ordu paneliyle cakismasin
+	bottom.offset_top = -118.0
 	bottom.offset_bottom = -6.0
 	bottom.mouse_filter = Control.MOUSE_FILTER_STOP
 	UiKit.panel(bottom, 10.0, 7.0)
@@ -134,15 +137,21 @@ func _ready() -> void:
 	brow.add_theme_constant_override("separation", 14)
 	bottom.add_child(brow)
 	var info_box := VBoxContainer.new()
-	info_box.custom_minimum_size = Vector2(230, 0)
+	info_box.custom_minimum_size = Vector2(210, 0)
 	brow.add_child(info_box)
 	sel_label = _mk_label(10)
 	info_box.add_child(sel_label)
 	queue_label = _mk_label(8)
 	queue_label.modulate = Color(1, 1, 1, 0.8)
 	info_box.add_child(queue_label)
-	action_box = HBoxContainer.new()
-	action_box.add_theme_constant_override("separation", 8)
+	form_box = HBoxContainer.new()
+	form_box.add_theme_constant_override("separation", 4)
+	info_box.add_child(form_box)
+	# tasma cozumu: butonlar satira sigmayinca alt satira AKAR
+	action_box = HFlowContainer.new()
+	action_box.add_theme_constant_override("h_separation", 6)
+	action_box.add_theme_constant_override("v_separation", 6)
+	action_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	brow.add_child(action_box)
 	bottom.visible = false
 
@@ -248,10 +257,11 @@ func _on_res(pid: int) -> void:
 	]
 	var have := {}
 	for e in GameState.entities.values():
-		if e.owner_pid == GameState.my_pid and e.def.has("size") and e.is_complete():
+		if e.owner_pid == GameState.my_pid and e.def.has("size") and e.is_complete() \
+				and not e.def.has("bridge") and not e.def.has("mine"):
 			have[e.def_id] = true
 	metro_label.text = Tr.t(&"metro_short") % [
-		GameState.pop_used[GameState.my_pid], D.METROPOLIS_POP, have.size(), D.BUILDINGS.size()
+		GameState.pop_used[GameState.my_pid], D.METROPOLIS_POP, have.size(), D.metro_types()
 	]
 
 
@@ -305,6 +315,8 @@ func _on_sel(ids: Array) -> void:
 func _refresh_panel() -> void:
 	for c in action_box.get_children():
 		c.queue_free()
+	for c in form_box.get_children():
+		c.queue_free()
 	queue_label.text = ""
 	if _sel.is_empty():
 		bottom.visible = false
@@ -332,6 +344,16 @@ func _refresh_panel() -> void:
 	else:
 		sel_label.text = "%s  %d/%d" % [Tr.t(first.def_id), int(first.hp), int(first.max_hp)]
 
+	# dizilis secimi: 2+ birimlik gruplarda gorunur, secim bozulana dek korunur
+	if units.size() > 1:
+		var forms: Array = [&"form_free", &"form_line", &"form_wedge", &"form_box"]
+		for fi in forms.size():
+			var fb := Button.new()
+			fb.text = Tr.t(forms[fi])
+			UiKit.button(fb, 7, UiKit.ACCENT_BLUE if input_ctrl.formation == fi else Color.TRANSPARENT)
+			fb.pressed.connect(_on_formation.bind(fi))
+			form_box.add_child(fb)
+
 	if has_worker:
 		for bid in BUILDABLE:
 			var bdef := D.building(bid)
@@ -356,7 +378,17 @@ func _refresh_panel() -> void:
 			up.modulate = Color(0.85, 1.0, 0.85)
 			up.pressed.connect(Net.send_upgrade.bind(first.id))
 			action_box.add_child(up)
+		if first.def_id != &"city_hall":
+			var dem := _action_btn(Tr.t(&"demolish"))
+			dem.modulate = Color(1.0, 0.75, 0.7)
+			dem.pressed.connect(Net.send_demolish.bind(first.id))
+			action_box.add_child(dem)
 		_refresh_queue()
+
+
+func _on_formation(f: int) -> void:
+	input_ctrl.formation = f
+	_refresh_panel()
 
 
 func _stat_str(udef: Dictionary) -> String:
@@ -382,8 +414,8 @@ func _benefit_str(bdef: Dictionary) -> String:
 func _action_btn(text: String) -> Button:
 	var b := Button.new()
 	b.text = text
-	UiKit.button(b, 8)
-	b.custom_minimum_size = Vector2(150, 56)
+	UiKit.button(b, 7)
+	b.custom_minimum_size = Vector2(128, 48)
 	return b
 
 

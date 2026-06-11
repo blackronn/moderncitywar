@@ -287,6 +287,27 @@ func _headgear(T: Dictionary, role: StringName) -> void:
 			p(7.6, 1.4, 0.9, 1.9, col("#d23c30"))
 			p(7.1, 1.9, 1.9, 0.9, col("#d23c30"))
 			p(6.0, 5.6, 3.2, 0.9, col("#cfd4d8"))   # beyaz yaka
+		&"mg":
+			# genis celik miğfer + cene bandi (agir piyade)
+			p(5.5, 1.4, 5.3, 1.9, col(T["dark"]))
+			p(6.1, 0.6, 4.0, 1.1, col(T["dark"]))
+			p(5.5, 1.4, 5.3, 0.5, col(T["light"]))
+			p(9.6, 1.9, 1.7, 1.0, col(T["dark"]))
+			p(6.6, 3.2, 0.6, 2.2, col("#3c4350"))   # cene bandi
+		&"commando":
+			# takim rengi bere + yuz boyasi (hizli baskin)
+			p(5.8, 1.6, 4.6, 1.3, col(T["main"]))
+			p(5.8, 1.6, 4.6, 0.45, col(T["light"]))
+			p(9.6, 2.2, 1.2, 0.8, col(T["main"]))
+			p(6.4, 4.4, 2.8, 0.5, col("#2a2230"))   # yuz boyasi seridi
+			p(6.0, 5.6, 3.2, 0.9, col("#34302e"))   # koyu yaka
+		&"mortar":
+			# kulakli kep + sirt cantasi (topcu)
+			p(5.7, 1.6, 4.9, 1.5, col("#5a5648"))
+			p(6.3, 0.8, 3.6, 1.0, col("#5a5648"))
+			p(5.7, 1.6, 4.9, 0.45, col("#787361"))
+			p(4.6, 6.6, 1.3, 3.6, col("#5a5648"))   # sirt cantasi
+			p(4.6, 6.6, 1.3, 0.5, col("#787361"))
 
 
 func _weapon(T: Dictionary, role: StringName, fire: float, recoil: float,
@@ -341,6 +362,35 @@ func _weapon(T: Dictionary, role: StringName, fire: float, recoil: float,
 				var hy := 4.6 - f * 2.0
 				p(11.4, hy, 0.8, 2.4, rgba(110, 230, 140, a))
 				p(10.6, hy + 0.8, 2.4, 0.8, rgba(110, 230, 140, a))
+		&"mg":
+			# agir makineli: kalin namlu + serit kutusu + on bacak (bipod)
+			p(9.0 + ax, 7.0, 1.4, 2.5, col(SK))
+			p(9.4 + ax, 7.2, 5.2, 1.3, col(STEELD))     # kalin namlu
+			p(9.4 + ax, 7.2, 5.2, 0.45, col("#576070"))
+			p(9.2 + ax, 6.9, 1.9, 2.1, col("#43474f"))  # govde
+			p(10.4 + ax, 8.6, 1.6, 1.5, col("#2f5a35")) # serit kutusu (yesil)
+			p(13.5 + ax, 8.4, 0.5, 1.8, col("#3c4350")) # bipod on
+			p(14.3 + ax, 8.4, 0.5, 1.8, col("#3c4350"))
+			if fire > 0.0:
+				_muzzle(15.2 + ax, 7.8, fire)
+		&"commando":
+			# kisa namlulu SMG + el bicagi silueti
+			p(9.0 + ax, 7.0, 1.4, 2.5, col(SK))
+			p(9.5 + ax, 7.4, 2.8, 1.0, col("#2f333a"))  # kisa SMG
+			p(9.4 + ax, 7.1, 1.5, 1.7, col("#43474f"))
+			p(10.4 + ax, 8.3, 0.8, 1.2, col("#2f333a"))
+			p(5.2, 9.4, 0.5, 1.6, col("#cdd2d9"))       # belde bicak
+			if fire > 0.0:
+				_muzzle(12.6 + ax, 7.9, fire)
+		&"mortar":
+			# yere kurulu havan borusu (yukari acili) + taban plakasi
+			p(8.9 + fx, fy, 1.4, 2.6, col(SK))
+			p(11.6, 11.6, 3.4, 0.9, col("#3c4350"))     # taban plakasi
+			rot_rect(12.2, 11.8, -1.05, 0.0, -0.8, 5.2, 1.5, col("#4a5160"))   # boru
+			rot_rect(12.2, 11.8, -1.05, 0.0, -0.8, 5.2, 0.5, col("#6a7282"))
+			if fire > 0.0:
+				_muzzle(14.4, 6.6, fire)
+				disc(14.0, 7.4, 1.0 + fire, rgba(200, 200, 210, 0.4 * fire))
 
 
 func _muzzle(x: float, y: float, f: float) -> void:
@@ -471,9 +521,18 @@ func bake_building_frame(id: StringName, t: float, pid: int) -> Image:
 	var fpx := Bible.building_frame_px(id)
 	var frame := blank(fpx, fpx)
 	_img = frame
-	_S = 1.0 if fpx == 26 else 2.0
+	_S = 1.0
 	_ox = 0.0
 	_oy = 0.0
+	if id == &"bridge_seg":
+		# kopru parcasi: tile boyutunda, altinda akan su + ahsap dosame
+		_t_water(t, 0)
+		_t_bridge_top()
+		return frame
+	if id == &"mine":
+		_b_mine(t, T)
+		return frame
+	_S = 1.0 if fpx == 26 else 2.0
 	disc(11, 19.5, 8.5, rgba(0, 0, 0, 0.14))
 	match id:
 		&"city_hall": _b_city_hall(t, T)
@@ -579,43 +638,104 @@ func _b_bank(t: float, _T: Dictionary) -> void:
 
 
 func _b_lumber(t: float, T: Dictionary) -> void:
-	## Turetilmis tasarim (bible stiliyle): kutuk depolu kereste atolyesi.
-	p(4.6, 17.4, 12.8, 1.3, col("#7c7058"))
-	p(5.0, 12.0, 8.5, 5.6, col("#a8845c"))     # ahsap atolye
-	p(5.0, 12.0, 8.5, 0.7, col("#c2a077"))
-	p(5.0, 12.0, 0.9, 5.6, col("#8a6a44"))
-	for r in 4:
-		p(4.4 + r * 0.8, 12.0 - r, 9.7 - 1.6 * r, 1.1, col(T["dark"]) if r == 0 else col(T["main"]))
-	p(6.4, 14.0, 2.2, 3.6, col("#5e4426"))     # kapi
-	p(6.4, 14.0, 2.2, 0.5, col("#7a5a36"))
-	# kutuk yigini
+	## Kereste Fabrikasi (yeni bible, birebir): kutuk istifi, ahsap atolye,
+	## DONEN daire testere, talas pufu, kizakta beslenen kutuk, takim flamasi.
+	# kutuk istifi (sol)
+	p(2.2, 15.2, 3.4, 2.1, col("#8a5e30"))
+	disc(2.4, 16.2, 1.0, col("#a9763f"))
+	disc(2.4, 16.2, 0.45, col("#caa069"))
+	disc(5.4, 16.2, 1.0, col("#a9763f"))
+	disc(5.4, 16.2, 0.45, col("#caa069"))
+	p(2.7, 13.3, 2.6, 1.9, col("#946530"))
+	disc(2.9, 14.2, 0.9, col("#a9763f"))
+	disc(2.9, 14.2, 0.4, col("#caa069"))
+	disc(5.1, 14.2, 0.9, col("#a9763f"))
+	disc(5.1, 14.2, 0.4, col("#caa069"))
+	# atolye (tahta duvar)
+	p(6.0, 9.6, 11, 7.9, col("#a9763f"))
+	p(6.0, 9.6, 11, 0.7, col("#c08c52"))
+	for i in range(1, 5):
+		p(6.0, 9.6 + i * 1.55, 11, 0.4, col("#8a5e30"))
+	p(6.0, 9.6, 0.9, 7.9, col("#8a5e30"))
+	# takim rengi cati
+	for r in 5:
+		p(5.0 + r * 0.9, 9.6 - r, 13 - 1.8 * r, 1.15, col(T["dark"]) if r == 0 else col(T["main"]))
+	p(5.0, 9.1, 13, 0.6, col(T["light"]))
+	# kapi
+	p(7.0, 13.2, 2.4, 4.3, col("#6e4a2a"))
+	p(7.0, 13.2, 2.4, 0.5, col("#8a6038"))
+	# buyuk daire testere (on-sag) -- doner
+	var scx := 13.2
+	var scy := 13.4
+	var R := 2.8
+	disc(scx, scy, R, col("#c9ced6"))
+	disc(scx, scy, R * 0.5, col("#9aa0a9"))
+	disc(scx, scy, 0.7, col("#5e636d"))
+	var rot := t * 7.0
+	for k in 10:
+		var a := k * PI / 5.0 + rot
+		p(scx + cos(a) * R - 0.35, scy + sin(a) * R - 0.35, 0.7, 0.7, col("#eef1f5"))
+	rot_rect(scx, scy, rot, -0.25, -R * 0.5, 0.5, R, col("#aeb4bd"))
+	rot_rect(scx, scy, rot, -R * 0.5, -0.25, R, 0.5, col("#aeb4bd"))
+	# bicak temasinda talas pufu
+	_smoke(scx - 0.6, scy + 1.6, t, Vector3i(214, 194, 150), 1.7)
+	# kizakta beslenen kutuk
+	p(9.0, 16.3, 4.6, 1.3, col("#a9763f"))
+	p(9.0, 16.3, 4.6, 0.4, col("#caa069"))
+	disc(9.0, 16.95, 0.65, col("#caa069"))
+	# cati flamasi
+	_flag(15.2, 6.0, 2.4, T, t)
+
+
+func _b_quarry(t: float, T: Dictionary) -> void:
+	## Tas Ocagi (yeni bible, birebir): terasli kaya cukuru, kesilmis tas
+	## bloklari, makarali ahsap vinc (sallanan tas blogu ceker), toz, flama.
+	# toprak platform
+	p(3.0, 16.0, 16, 3.6, col("#8a6a44"))
+	p(3.0, 16.0, 16, 0.7, col("#a07e52"))
+	p(3.0, 18.9, 16, 0.7, col("#6e5235"))
+	# terasli kaya cukuru (sol, basamak basamak)
+	p(3.4, 13.8, 6.6, 2.4, col("#9aa0a9"))
+	p(3.4, 13.8, 6.6, 0.6, col("#b3b9c1"))
+	p(2.8, 15.9, 5.6, 2.2, col("#868d97"))
+	p(2.8, 15.9, 5.6, 0.6, col("#9aa0a9"))
+	p(2.4, 17.8, 4.8, 1.6, col("#747983"))
+	p(2.4, 17.8, 4.8, 0.5, col("#868d97"))
 	for i in 3:
-		var lx := 14.2 + (i % 2) * 1.0
-		var ly := 16.6 - i * 1.4
-		disc(lx, ly, 1.05, col("#8a5e30"))
-		disc(lx + 1.8, ly, 1.05, col("#6e4a2a"))
-		disc(lx, ly, 0.5, col("#caa069"))
-	# testere tozu
-	_smoke(9.4, 12.4, t, Vector3i(190, 160, 110), 1.2)
-
-
-func _b_quarry(t: float, _T: Dictionary) -> void:
-	## Turetilmis tasarim: kaya yatagi + ahsap vinc iskelesi.
-	disc(11, 16.5, 5.6, col("#8d847a"))
-	disc(11, 16.0, 5.0, col("#a59c90"))
-	disc(8.4, 15.2, 2.6, col("#9aa0a9"))
-	disc(12.6, 16.2, 2.2, col("#868d97"))
-	disc(8.4, 14.4, 1.9, col("#b3b9c1"))
-	p(13.8, 14.6, 1, 1, col("#747983"))
-	# vinc iskelesi
-	p(6.0, 8.6, 0.9, 8.6, col("#6e4a2a"))
-	p(5.4, 8.2, 7.6, 0.9, col("#8a6a44"))
-	p(12.4, 8.6, 0.7, 2.6, col("#3c4350"))      # halat
-	p(11.9, 11.0, 1.7, 1.3, col("#5e636d"))     # kova
-	var g := (sin(t * 2.4) + 1.0) / 2.0
-	if g > 0.7:
-		p(7.8, 13.6, 0.9, 0.9, rgba(255, 255, 255, g))
-	_smoke(11.0, 13.0, t, Vector3i(150, 145, 135), 0.9)
+		p(4.0 + i * 1.9, 14.0, 0.35, 2.0, col("#6e747e"))   # kesim izleri
+	# istiflenmis kesme taslar (sag)
+	p(12.8, 15.4, 3.2, 2.3, col("#b3b9c1"))
+	p(12.8, 15.4, 3.2, 0.6, col("#cdd2d9"))
+	p(12.8, 15.4, 0.5, 2.3, col("#9aa0a9"))
+	p(13.6, 13.1, 2.6, 2.1, col("#aab0b8"))
+	p(13.6, 13.1, 2.6, 0.6, col("#c4c9d0"))
+	p(14.2, 11.2, 2.0, 1.7, col("#b8bec6"))
+	p(14.2, 11.2, 2.0, 0.5, col("#d0d5db"))
+	# ahsap A-vinc
+	p(7.2, 5.4, 1.0, 9.2, col("#8a5e30"))
+	p(11.0, 5.4, 1.0, 9.2, col("#8a5e30"))
+	p(7.2, 5.4, 4.8, 1.0, col("#7a4f28"))
+	p(7.2, 5.4, 4.8, 0.4, col(T["main"]))   # takim boyali kiris
+	p(7.0, 9.0, 5.4, 0.9, col("#7a4f28"))
+	p(7.4, 5.6, 0.4, 9.0, col("#9a6c3c"))
+	# makara
+	disc(9.6, 5.4, 1.1, col("#5e636d"))
+	disc(9.6, 5.4, 0.4, col("#cdd2d9"))
+	# halat + sallanan tas blogu
+	var bob := sin(t * 1.6) * 1.1
+	p(9.5, 5.4, 0.3, 4.0 + bob, col("#caa069"))
+	p(8.7, 9.2 + bob, 1.8, 1.8, col("#b3b9c1"))
+	p(8.7, 9.2 + bob, 1.8, 0.5, col("#cdd2d9"))
+	p(8.7, 9.2 + bob, 0.5, 1.8, col("#9aa0a9"))
+	# cukurdan yukselen toz
+	_smoke(5.2, 15.4, t, Vector3i(170, 150, 120), 1.2)
+	_smoke(6.1, 14.9, t + 0.5, Vector3i(155, 135, 105), 1.0)
+	# vinc tepesinde takim flamasi
+	_flag(7.4, 2.6, 2.8, T, t)
+	# kesme blokta parilti
+	var g := (sin(t * 2.6) + 1.0) / 2.0
+	if g > 0.72:
+		p(14.7, 11.6, 0.8, 0.8, rgba(255, 255, 255, g))
 
 
 func _b_barracks(t: float, T: Dictionary) -> void:
@@ -660,6 +780,23 @@ func _b_factory(t: float, T: Dictionary) -> void:
 		p(10.6, 14.0 + i * 1.0, 3.4, 0.4, col("#3a3e46"))
 
 
+func _b_mine(t: float, T: Dictionary) -> void:
+	## Mayin (26px kare, kucuk): toprak tumsek + celik disk + kurma isigi.
+	## Rakip ekranda HIC gorunmez; bu gorsel yalnizca sahibine.
+	disc(13, 16.5, 4.4, rgba(0, 0, 0, 0.14))
+	disc(13, 15.0, 3.6, col("#8a6a44"))
+	disc(13, 14.4, 3.0, col("#a07e52"))
+	disc(13, 13.8, 2.2, col("#5e636d"))
+	disc(13, 13.6, 1.5, col("#747983"))
+	p(11.2, 12.2, 0.7, 1.2, col("#9aa0a9"))   # tetik pimleri
+	p(12.7, 11.8, 0.7, 1.4, col("#9aa0a9"))
+	p(14.2, 12.2, 0.7, 1.2, col("#9aa0a9"))
+	p(10.6, 15.6, 0.9, 0.9, col(T["main"]))   # takim pipi
+	var blink := fmod(t, 2.0) < 0.25
+	if blink:
+		p(12.7, 13.2, 0.9, 0.9, col("#ff5a4a"))
+
+
 func _b_turret(t: float, T: Dictionary) -> void:
 	p(6.2, 13.0, 9.6, 5.0, col("#b9bec7"))
 	p(6.2, 13.0, 9.6, 0.8, col("#d3d8df"))
@@ -701,26 +838,63 @@ func bake_tile_frame(kind: StringName, t: float, seed_v: int) -> Image:
 	_S = 1.0
 	_ox = 0.0
 	_oy = 0.0
-	if kind == &"water" or kind == &"bridge":
-		_t_water(t, seed_v)
-		if kind == &"bridge":
-			_t_bridge_top()
-		return frame
-	p(0, 0, 16, 16, col("#5fb84f"))
-	for i in 10:
-		var bx := _trand(seed_v, i) * 15.0
-		var by := _trand(seed_v, i + 40) * 15.0
-		p(bx, by, 1, 1, col("#54a945") if _trand(seed_v, i + 9) > 0.5 else col("#74cf63"))
 	match kind:
+		&"water", &"bridge":
+			_t_water(t, seed_v)
+			if kind == &"bridge":
+				_t_bridge_top()
 		&"grass":
+			_t_ground(seed_v, col("#5fb84f"), col("#54a945"), col("#74cf63"))
 			var sw := sin(t * 2.0 + seed_v) * 0.5
 			p(7.0 + sw, 9, 0.7, 1.6, col("#3f9a37"))
 			p(7.0 + sw, 8.5, 0.9, 0.9, col("#ffe14d") if seed_v % 2 == 1 else col("#ff7aa0"))
+		&"snow":
+			# kar ovasi: soguk beyaz zemin + mavi golgeli dokular + isilti
+			_t_ground(seed_v, col("#e6edf3"), col("#cfdbe6"), col("#f7fbff"))
+			var g := (sin(t * 2.0 + seed_v) + 1.0) / 2.0
+			if g > 0.65:
+				p(4.0 + (seed_v * 3) % 8, 5.0 + (seed_v * 5) % 7, 0.9, 0.9, rgba(255, 255, 255, g))
+		&"hill":
+			# engebe: kayalik sirt — yurunur ama YAVAS (TILE_SPEED)
+			_t_ground(seed_v, col("#8d8273"), col("#7a7062"), col("#9c9180"))
+			disc(5.5, 6.0, 2.4, col("#6e6557"))
+			disc(5.2, 5.4, 1.8, col("#857a6a"))
+			disc(11.0, 10.5, 2.8, col("#6e6557"))
+			disc(10.6, 9.8, 2.1, col("#857a6a"))
+			p(3.0, 12.0, 2.0, 0.8, col("#5e564a"))
+			p(12.0, 4.0, 1.6, 0.7, col("#5e564a"))
+		# --- ozellik katmani: SEFFAF zemin (cim VEYA kar ustune bindirilir) ---
 		&"forest":
 			_t_tree(t, seed_v)
 		&"stone":
 			_t_rock(t, seed_v)
+		&"gold":
+			_t_gold(t, seed_v)
 	return frame
+
+
+func _t_ground(seed_v: int, base: Color, dark: Color, light: Color) -> void:
+	p(0, 0, 16, 16, base)
+	for i in 10:
+		var bx := _trand(seed_v, i) * 15.0
+		var by := _trand(seed_v, i + 40) * 15.0
+		p(bx, by, 1, 1, dark if _trand(seed_v, i + 9) > 0.5 else light)
+
+
+func _t_gold(t: float, seed_v: int) -> void:
+	## Tarafsiz bolge altin damari: koyu kaya + parlayan altin yuvalari.
+	disc(8, 11, 3.0, rgba(0, 0, 0, 0.12))
+	disc(7, 9, 2.6, col("#7a7062"))
+	disc(10, 10, 2.0, col("#6e6557"))
+	disc(7, 8.2, 2.0, col("#8d8273"))
+	disc(6.4, 8.6, 1.0, col("#d4a93c"))
+	disc(9.8, 9.6, 0.85, col("#d4a93c"))
+	p(8.2, 7.2, 1.0, 1.0, col("#f3c64a"))
+	var g := (sin(t * 2.4 + seed_v) + 1.0) / 2.0
+	if g > 0.6:
+		p(6.2, 7.8, 0.9, 0.9, rgba(255, 240, 170, g))
+	if g > 0.8:
+		p(9.9, 9.2, 0.8, 0.8, rgba(255, 240, 170, g))
 
 
 func _trand(seed_v: int, n: int) -> float:
@@ -823,6 +997,13 @@ func bake_fx_frame(id: StringName, t: float) -> Image:
 			for k in 5:
 				var pp := fmod(t * 1.2 + k * 0.2, 1.0)
 				disc(cx - 3.0 + k * 1.6, 13.5, 0.6 + pp * 1.2, rgba(200, 190, 170, (1.0 - pp) * 0.5))
+		&"dirt":
+			# iska eden merminin carptigi yerden kalkan kucuk toz
+			var dp := clampf(t / 0.28, 0.0, 1.0)
+			var da := 1.0 - dp
+			disc(cx, cy + 1.0 - dp * 2.0, 0.8 + dp * 1.6, rgba(150, 130, 100, da * 0.7))
+			p(cx - 1.5 - dp * 2.0, cy + 0.5, 0.8, 0.8, rgba(120, 104, 80, da))
+			p(cx + 1.0 + dp * 2.0, cy + 0.2, 0.8, 0.8, rgba(120, 104, 80, da))
 	return frame
 
 

@@ -20,6 +20,7 @@ func setup(grid: PackedInt32Array) -> void:
 
 
 func _setup_one(a: AStarGrid2D, grid: PackedInt32Array, half_pid: int) -> void:
+	## half_pid 1/2: kendi yari + TARAFSIZ orta bant serbest, rakip yari kapali.
 	a.region = Rect2i(0, 0, D.MAP_W, D.MAP_H)
 	a.cell_size = Vector2(1, 1)
 	a.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
@@ -28,24 +29,36 @@ func _setup_one(a: AStarGrid2D, grid: PackedInt32Array, half_pid: int) -> void:
 	for y in D.MAP_H:
 		for x in D.MAP_W:
 			var solid := not MapGen.walkable(grid[y * D.MAP_W + x])
-			if half_pid == 1 and x >= mid:
+			if half_pid == 1 and x >= mid + D.NEUTRAL_HALF_W:
 				solid = true
-			elif half_pid == 2 and x < mid:
+			elif half_pid == 2 and x < mid - D.NEUTRAL_HALF_W:
 				solid = true
 			a.set_point_solid(Vector2i(x, y), solid)
 
 
 func set_rect_solid(top_left: Vector2i, size: Vector2i, solid: bool) -> void:
+	var mid := D.MAP_W / 2
 	for dy in size.y:
 		for dx in size.x:
 			var c := top_left + Vector2i(dx, dy)
 			if in_bounds(c):
 				astar.set_point_solid(c, solid)
-				var mid := D.MAP_W / 2
-				if c.x < mid:
+				if c.x < mid + D.NEUTRAL_HALF_W:
 					astar_half[1].set_point_solid(c, solid)
-				else:
+				if c.x >= mid - D.NEUTRAL_HALF_W:
 					astar_half[2].set_point_solid(c, solid)
+
+
+func set_cell_walk(c: Vector2i, walk: bool) -> void:
+	## Kopru kuruldu/yikildi: su hucresi yurunebilir olur (bolge sinirlarini korur).
+	if not in_bounds(c):
+		return
+	var mid := D.MAP_W / 2
+	astar.set_point_solid(c, not walk)
+	if c.x < mid + D.NEUTRAL_HALF_W:
+		astar_half[1].set_point_solid(c, not walk)
+	if c.x >= mid - D.NEUTRAL_HALF_W:
+		astar_half[2].set_point_solid(c, not walk)
 
 
 func in_bounds(c: Vector2i) -> bool:

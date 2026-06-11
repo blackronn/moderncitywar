@@ -12,6 +12,7 @@ var drag_start := Vector2.ZERO
 var drag_cur := Vector2.ZERO
 var placing := false
 var place_def: StringName
+var formation := 0    # 0 serbest, 1 saf, 2 kama, 3 kutu — bozulana kadar korunur
 
 
 func _ready() -> void:
@@ -69,6 +70,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			cancel_placement()
 		else:
 			_set_selection([])
+	elif event is InputEventKey and event.pressed and event.keycode == KEY_M:
+		# mayin suphesi isareti (lokal)
+		var cell := Vector2i((get_global_mouse_position() / float(D.TILE)).floor())
+		game.toggle_marker(cell)
 
 
 func _try_place(wp: Vector2) -> void:
@@ -165,8 +170,63 @@ func _command(wp: Vector2) -> void:
 	var t := GameState.grid_at(cell)
 	if D.TILE_RES.has(t):
 		Net.send_gather(unit_ids, cell)
+		return
+	# dizilis: secili grup hedef noktada secili duzene gore konuslanir
+	if formation > 0 and unit_ids.size() > 1:
+		_move_in_formation(unit_ids, wp)
 	else:
 		Net.send_move(unit_ids, wp)
+
+
+func _move_in_formation(unit_ids: PackedInt32Array, wp: Vector2) -> void:
+	## Her birime dizilisteki yuvasinin hedefi gonderilir; grup o duzende
+	## durur ve duzen bozulana (yeni emir/kovalamaca) kadar oyle savasir.
+	var centroid := Vector2.ZERO
+	var nodes: Array = []
+	for id in unit_ids:
+		var e: Node = GameState.ent(id)
+		if e != null:
+			nodes.append(e)
+			centroid += e.position
+	if nodes.is_empty():
+		return
+	centroid /= nodes.size()
+	var dir := (wp - centroid).normalized()
+	if dir == Vector2.ZERO:
+		dir = Vector2.RIGHT
+	var slots := _formation_slots(formation, nodes.size(), dir)
+	# yakin birim yakin yuvaya: basit aciyla sirala
+	nodes.sort_custom(func(a, b): return a.position.x < b.position.x)
+	for i in nodes.size():
+		Net.send_move(PackedInt32Array([nodes[i].id]), wp + slots[i])
+
+
+func _formation_slots(kind: int, n: int, dir: Vector2) -> Array:
+	var perp := Vector2(-dir.y, dir.x)
+	var out: Array = []
+	match kind:
+		1:   # SAF: yan yana siralar (8'lik)
+			for i in n:
+				var row := i / 8
+				var col := i % 8
+				var row_n: int = mini(8, n - row * 8)
+				out.append(perp * (col - (row_n - 1) / 2.0) * 14.0 - dir * row * 16.0)
+		2:   # KAMA: V ucu ileride
+			out.append(Vector2.ZERO)
+			for i in range(1, n):
+				var side := 1.0 if i % 2 == 1 else -1.0
+				var k := ceili(i / 2.0)
+				out.append(-dir * k * 13.0 + perp * side * k * 11.0)
+		3:   # KUTU: kare blok
+			var cols := ceili(sqrt(float(n)))
+			for i in n:
+				var row := i / cols
+				var col := i % cols
+				out.append(perp * (col - (cols - 1) / 2.0) * 14.0 - dir * row * 14.0)
+		_:
+			for i in n:
+				out.append(Vector2.ZERO)
+	return out
 
 
 func select_type(def_id: StringName) -> void:

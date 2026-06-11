@@ -59,6 +59,7 @@ func _physics_process(delta: float) -> void:
 	_tick_units(dt)
 	_tick_combat(dt)
 	_tick_healers(dt)
+	_tick_mines()
 	if tick % 15 == 0 and _res_dirty:
 		_res_dirty = false
 		Bus.resources_changed.emit(1)
@@ -101,6 +102,8 @@ func spawn_building(def_id: StringName, pid: int, top_left: Vector2i, completed:
 
 
 func despawn(node: Node, reason: int) -> void:
+	if node.def.has("bridge") and node.is_complete():
+		pathing.set_cell_walk(node.cell, false)   # kopru yikildi: su geri geldi
 	var id: int = node.id
 	game.despawn_entity_visual(id, reason)
 	Net.bc_despawn(id, reason)
@@ -140,15 +143,15 @@ func _half_pid(pid: int) -> int:
 
 
 func _clamp_half(pid: int, c: Vector2i, toast: bool = false) -> Vector2i:
-	## Baristayken hedefi orta hattin kendi tarafina ceker.
+	## Baristayken hedefi kendi yari + tarafsiz bant icine ceker.
 	if not _at_peace():
 		return c
 	var mid := D.MAP_W / 2
 	var out := c
-	if pid == 1 and c.x >= mid:
-		out = Vector2i(mid - 1, c.y)
-	elif pid == 2 and c.x < mid:
-		out = Vector2i(mid, c.y)
+	if pid == 1 and c.x >= mid + D.NEUTRAL_HALF_W:
+		out = Vector2i(mid + D.NEUTRAL_HALF_W - 1, c.y)
+	elif pid == 2 and c.x < mid - D.NEUTRAL_HALF_W:
+		out = Vector2i(mid - D.NEUTRAL_HALF_W, c.y)
 	if toast and out != c:
 		Net.reject_to(pid, D.Reject.BORDER)
 	return out
@@ -160,26 +163,95 @@ func handle_build(pid: int, def_id: StringName, top_left: Vector2i, builders: Pa
 		return
 	var bdef := D.building(def_id)
 	var afford: bool = GameState.can_afford(pid, bdef["cost"])
+	var mid := D.MAP_W / 2
+	# bolge sinirlari: normal binalar baristayken KENDI yarisinda; mayin ve
+	# kopru tarafsiz banda da kurulabilir (altin yolu / nehir gecisi)
+	var reach_neutral: bool = bdef.has("mine") or bdef.has("bridge")
 	var bmin := -1
 	var bmax := 9999
 	if _at_peace():
 		if pid == 1:
-			bmax = D.MAP_W / 2 - 1
+			bmax = (mid + D.NEUTRAL_HALF_W - 1) if reach_neutral else (mid - D.NEUTRAL_HALF_W - 1)
 		else:
-			bmin = D.MAP_W / 2
-	var verdict := validate_placement(
-		GameState.grid, pathing, _unit_cells(), _own_building_rects(pid), bdef, top_left,
-		afford, bmin, bmax)
+			bmin = (mid - D.NEUTRAL_HALF_W) if reach_neutral else (mid + D.NEUTRAL_HALF_W)
+	var verdict: int
+	if bdef.has("bridge"):
+		verdict = _validate_bridge(top_left, afford, bmin, bmax)
+	elif bdef.has("mine"):
+		verdict = _validate_mine(top_left, afford, bmin, bmax)
+	else:
+		verdict = validate_placement(
+			GameState.grid, pathing, _unit_cells(), _own_building_rects(pid), bdef, top_left,
+			afford, bmin, bmax)
 	if verdict != -1:
 		Net.reject_to(pid, verdict)
 		return
 	GameState.pay(pid, bdef["cost"])
 	_res_dirty = true
 	var b := spawn_building(def_id, pid, top_left, false)
-	_on_grid_blocked(Rect2i(top_left, bdef["size"]))
+	if not bdef.has("bridge") and not bdef.has("mine"):
+		_on_grid_blocked(Rect2i(top_left, bdef["size"]))
 	for u in _owned_units(pid, builders):
 		if u.def_id == &"worker":
 			_assign_build(u, b)
+
+
+func _validate_bridge(cell: Vector2i, afford: bool, bmin: int, bmax: int) -> int:
+	## Kopru parcasi: SU hucresine, yurunebilir bir komsuya bitisik (adim adim).
+	if GameState.grid_at(cell) != D.Tile.WATER:
+		return D.Reject.BAD_SPOT
+	if cell.x < bmin or cell.x > bmax:
+		return D.Reject.BORDER
+	for b in _buildings():
+		if b.def.has("bridge") and b.cell == cell:
+			return D.Reject.BLOCKED
+	var has_anchor := false
+	for off: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+		var n := cell + off
+		var t := GameState.grid_at(n)
+		if t != -1 and t != D.Tile.WATER and t != D.Tile.HILL:
+			has_anchor = true
+			break
+		if _bridge_entity_at(n) != null:
+			has_anchor = true
+			break
+	if not has_anchor:
+		return D.Reject.BAD_SPOT
+	if not afford:
+		return D.Reject.NO_RES
+	return -1
+
+
+func _bridge_entity_at(cell: Vector2i) -> Node:
+	for b in _buildings():
+		if b.def.has("bridge") and b.cell == cell and b.is_complete():
+			return b
+	return null
+
+
+func _validate_mine(cell: Vector2i, afford: bool, bmin: int, bmax: int) -> int:
+	## Mayin: zemine, bina ustune degil; sehir yaricapi kurali YOK (ileri hatta kurulur).
+	var t := GameState.grid_at(cell)
+	if not D.BUILDABLE_TILES.has(t):
+		return D.Reject.BAD_SPOT
+	if cell.x < bmin or cell.x > bmax:
+		return D.Reject.BORDER
+	if pathing.is_solid(cell):
+		return D.Reject.BLOCKED
+	for b in _buildings():
+		if b.def.has("mine") and b.cell == cell:
+			return D.Reject.BLOCKED
+	if not afford:
+		return D.Reject.NO_RES
+	return -1
+
+
+func handle_demolish(pid: int, building_id: int) -> void:
+	## Kendi binani yik (kopru dahil). Belediye yikilamaz.
+	var b: Node = GameState.ent(building_id)
+	if b == null or not b.def.has("size") or b.owner_pid != pid or b.def_id == &"city_hall":
+		return
+	despawn(b, 2)
 
 
 func handle_assign_build(pid: int, ids: PackedInt32Array, building_id: int) -> void:
@@ -297,7 +369,7 @@ static func validate_placement(grid: PackedInt32Array, p_pathing, unit_cells: Ar
 				return D.Reject.BAD_SPOT
 			if c.x < min_x or c.x > max_x:
 				return D.Reject.BORDER
-			if grid[c.y * D.MAP_W + c.x] != D.Tile.GRASS:
+			if not D.BUILDABLE_TILES.has(grid[c.y * D.MAP_W + c.x]):
 				return D.Reject.BAD_SPOT
 			if p_pathing.is_solid(c):
 				return D.Reject.BLOCKED
@@ -408,6 +480,8 @@ func _tick_units(dt: float) -> void:
 		var n: int = mini(builders_on[bid], D.MAX_BUILDERS)
 		b.set_construction(b.construction + dt * float(n) / maxf(b.def["build_s"], 0.01))
 		if b.is_complete():
+			if b.def.has("bridge"):
+				pathing.set_cell_walk(b.cell, true)   # kopru bitti: su artik gecilir
 			recount_pop()
 			_res_dirty = true
 
@@ -496,6 +570,40 @@ func _chase(u: Node, tgt: Node, dt: float) -> void:
 	_follow(u, dt)
 
 
+func _tick_mines() -> void:
+	## Savastayken ustune dusman birimi basan mayin patlar: genis alan hasari,
+	## zirhliya x1.5 (tank avcisi). Birden fazla hucreyi ayni anda vurur.
+	if GameState.war_state != D.War.WAR:
+		return
+	for m in _buildings():
+		if not m.def.has("mine") or not m.is_complete():
+			continue
+		var trig: float = m.def["m_trigger_t"]
+		var fired := false
+		for o in GameState.entities.values():
+			if o.owner_pid == m.owner_pid or not o.def.has("speed_t"):
+				continue
+			if o.position.distance_to(m.position) / float(D.TILE) <= trig:
+				fired = true
+				break
+		if not fired:
+			continue
+		var victim_pid: int = GameState.enemy_of(m.owner_pid)
+		Net.ev(D.Ev.IMPACT, [m.position, 1.6])
+		var victims: Array = []
+		for o in GameState.entities.values():
+			if o.owner_pid != victim_pid:
+				continue
+			if o.position.distance_to(m.position) / float(D.TILE) <= m.def["m_splash_t"]:
+				var dmg: float = m.def["m_dmg"]
+				if o.def.get("klass", D.Klass.BUILDING) == D.Klass.ARMOR:
+					dmg *= 1.5
+				victims.append([o, dmg])
+		_apply_damage(victims)
+		despawn(m, 1)
+		return   # tick basina tek patlama yeter (zincirleme sonraki tick)
+
+
 func _tick_healers(dt: float) -> void:
 	## Sihhiyeci: bos/iyilestirme gorevindeyken yakindaki hasarli dostu bulur,
 	## menzile yuruyup saniyede heal_rate kadar can doldurur. Savas durumundan
@@ -554,14 +662,39 @@ func _nearest_damaged_friendly(e: Node, range_t: float) -> Node:
 
 func _fire(att: Node, tgt: Node) -> void:
 	att.cooldown = att.def["cooldown_s"]
+	var splash: float = att.def.get("splash_t", 0.0)
+
+	# --- havan: mermi her zaman hedefin CEVRESINE sacilir, alana vurur ---
+	if att.def.get("arc", false):
+		var sc: float = att.def.get("scatter_t", 0.0) * D.TILE
+		var sa := rng.randf() * TAU
+		var impact: Vector2 = tgt.position + Vector2(cos(sa), sin(sa)) * (rng.randf() * sc)
+		Net.ev(D.Ev.TRACER, [att.position, impact, 0])
+		Net.ev(D.Ev.IMPACT, [impact, 0.9])
+		_apply_area(att, tgt.owner_pid, impact, splash, 1.0)
+		return
+
+	# --- iska: mermi sapar, nereye gittigi gorunur (toz pufu) ---
+	var miss_c: float = att.def.get("miss", 0.0)
+	if miss_c > 0.0 and not tgt.def.has("size") and rng.randf() < miss_c:
+		var ma := rng.randf() * TAU
+		var mp: Vector2 = tgt.position + Vector2(cos(ma), sin(ma)) \
+			* (D.TILE * (0.5 + rng.randf() * D.MISS_SPREAD_T))
+		Net.ev(D.Ev.TRACER, [att.position, mp, 0])
+		if splash > 0.0:
+			# sapan roket yine patlar: dustugu yerde alan hasari
+			Net.ev(D.Ev.IMPACT, [mp, 0.8])
+			_apply_area(att, tgt.owner_pid, mp, splash, 0.5)
+		else:
+			Net.ev(D.Ev.MISS_FX, [mp])
+		return
+
+	# --- isabet ---
 	var dmg := attack_damage(att.def_id, att.def, tgt.def_id, tgt.def, _dist_t(att, tgt))
-	# gelistirilmis taret: seviye basina sabit ek hasar
 	if att.def.has("up_dmg"):
 		dmg += float(att.def["up_dmg"]) * float(att.level - 1)
 	Net.ev(D.Ev.TRACER, [att.position, tgt.position, 0])
-	# alan hasari (rpg/tank): hedefin cevresindeki dusman varliklarina %50
 	var victims: Array = [[tgt, dmg]]
-	var splash: float = att.def.get("splash_t", 0.0)
 	if splash > 0.0:
 		Net.ev(D.Ev.IMPACT, [tgt.position, 0.8])
 		for o in GameState.entities.values():
@@ -569,6 +702,25 @@ func _fire(att: Node, tgt: Node) -> void:
 				continue
 			if _dist_t(o, tgt) <= splash:
 				victims.append([o, attack_damage(att.def_id, att.def, o.def_id, o.def, 0.0) * 0.5])
+	_apply_damage(victims)
+
+
+func _apply_area(att: Node, victim_pid: int, at: Vector2, radius_t: float, mult: float) -> void:
+	## Noktasal patlama: yaricap icindeki TUM victim_pid varliklarina hasar.
+	var victims: Array = []
+	for o in GameState.entities.values():
+		if o.owner_pid != victim_pid:
+			continue
+		var d: float = o.position.distance_to(at) / float(D.TILE)
+		if o.def.has("size"):
+			var r: Rect2 = o.footprint_px()
+			d = at.clamp(r.position, r.position + r.size).distance_to(at) / float(D.TILE)
+		if d <= radius_t:
+			victims.append([o, attack_damage(att.def_id, att.def, o.def_id, o.def, 0.0) * mult])
+	_apply_damage(victims)
+
+
+func _apply_damage(victims: Array) -> void:
 	for v in victims:
 		var n: Node = v[0]
 		n.set_hp(n.hp - v[1])
@@ -667,9 +819,9 @@ func _check_victory() -> void:
 			continue
 		var have := {}
 		for b in _buildings(pid):
-			if b.is_complete():
+			if b.is_complete() and not b.def.has("bridge") and not b.def.has("mine"):
 				have[b.def_id] = true
-		if have.size() >= D.BUILDINGS.size():
+		if have.size() >= D.metro_types():
 			Net.game_over(pid, D.Reason.METROPOLIS)
 			return
 
@@ -747,7 +899,9 @@ func _follow(u: Node, dt: float) -> bool:
 			return true
 		next_c = u.path[u.path_i]
 	var target := cell_center(next_c)
-	var speed: float = u.def["speed_t"] * D.TILE
+	# engebe: arazi turu hareket kabiliyetini belirler (kar yavas, kayalik cok yavas)
+	var terrain_mult: float = D.TILE_SPEED.get(GameState.grid_at(u.cell()), 1.0)
+	var speed: float = u.def["speed_t"] * D.TILE * terrain_mult
 	var d: Vector2 = target - u.position
 	var step := speed * dt
 	if d.length() <= step:
@@ -771,7 +925,8 @@ func _do_gather(u: Node, c: Vector2i, dt: float) -> void:
 	_res_dirty = true
 	if node_res.get(c, 0.0) <= 0.0:
 		node_res.erase(c)
-		Net.ev(D.Ev.DEPLETED, [c])   # grid'i iki ucta da GRASS yapar
+		var base := D.Tile.SNOW if GameState.map_type == D.MapType.SNOW else D.Tile.GRASS
+		Net.ev(D.Ev.DEPLETED, [c, base])   # tukenen hucre zemine doner (cim/kar)
 		for w in _units():
 			if w.task.get("kind") == &"gather" and w.task.get("cell") == c:
 				_retarget_gather(w, c)

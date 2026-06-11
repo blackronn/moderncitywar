@@ -6,6 +6,7 @@ extends Node
 ## Host otoriterdir: istemci yalnizca cmd_* gonderir, simulasyonu host kosar.
 
 const D := preload("res://scripts/autoload/defs.gd")
+const MapGen := preload("res://scripts/sim/map_gen.gd")
 
 const PORT := 8910
 
@@ -13,9 +14,12 @@ var net_active := false              # gercek baglanti var mi (offline onizleme 
 var client_peer_id := 0              # host tarafinda istemcinin ENet peer id'si
 var game_ready := false              # lokal game sahnesi sv_* almaya hazir mi
 var sim: Node = null                 # host'ta game.gd kaydeder (sim.gd)
+var my_map_vote := -1                # lobide secilen harita (-1 = rastgele)
 var _buffer: Array = []              # game_ready oncesi gelen [metod, argv] cagrilari
 var _host_scene_ready := false
 var _client_ready := false
+var _client_vote := -1
+var _vote_wait := false
 
 
 func _ready() -> void:
@@ -71,11 +75,45 @@ func _on_peer_connected(id: int) -> void:
 	if not is_host():
 		return
 	client_peer_id = id
-	# mac seed'i: degeri rastgele olabilir, onemli olan iki uca ayni gitmesi
-	GameState.reset((randi() % 899999) + 100000)
+	# harita OYLAMASI: istemcinin oyunu bekle (gelmezse 2.5 sn sonra basla)
+	_client_vote = -1
+	_vote_wait = true
+	get_tree().create_timer(2.5).timeout.connect(_begin_handshake)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func cmd_map_vote(t: int) -> void:
+	if not is_host() or multiplayer.get_remote_sender_id() != client_peer_id:
+		return
+	_client_vote = clampi(t, -1, 4)
+	_begin_handshake()
+
+
+func _begin_handshake() -> void:
+	if not _vote_wait or client_peer_id == 0 or not is_host():
+		return
+	_vote_wait = false
+	# oylama cozumu: ayni -> o harita; farkli -> ikisinden rastgele;
+	# oy yoksa tamamen rastgele
+	var choice := _resolve_votes(my_map_vote, _client_vote)
+	var base := (randi() % 899999) + 100000
+	var seed_v := MapGen.seed_with_type(base, choice) if choice >= 0 else base
+	GameState.reset(seed_v)
 	GameState.my_pid = 1
-	sv_hello.rpc_id(id, 2, GameState.seed_v, D.defs_hash())
+	sv_hello.rpc_id(client_peer_id, 2, GameState.seed_v, D.defs_hash())
 	get_tree().change_scene_to_file("res://scenes/game.tscn")
+
+
+func _resolve_votes(a: int, b: int) -> int:
+	if a >= 0 and b >= 0:
+		if a == b:
+			return a
+		return a if randi() % 2 == 0 else b
+	if a >= 0:
+		return a
+	if b >= 0:
+		return b
+	return -1
 
 
 func _on_peer_disconnected(_id: int) -> void:
@@ -90,6 +128,7 @@ func _on_peer_disconnected(_id: int) -> void:
 
 
 func _on_connected_ok() -> void:
+	cmd_map_vote.rpc_id(1, my_map_vote)   # harita oyunu bildir
 	Bus.lobby_status.emit(Tr.t(&"connected_waiting"))
 
 
@@ -217,6 +256,13 @@ func send_upgrade(building_id: int) -> void:
 		cmd_upgrade.rpc_id(1, building_id)
 
 
+func send_demolish(building_id: int) -> void:
+	if is_host():
+		if sim != null: sim.handle_demolish(1, building_id)
+	else:
+		cmd_demolish.rpc_id(1, building_id)
+
+
 func send_train(building_id: int, def_id: StringName) -> void:
 	if is_host():
 		if sim != null: sim.handle_train(1, building_id, def_id)
@@ -276,6 +322,12 @@ func cmd_upgrade(building_id: int) -> void:
 
 
 @rpc("any_peer", "call_remote", "reliable")
+func cmd_demolish(building_id: int) -> void:
+	if _cmd_pid() == 2 and sim != null:
+		sim.handle_demolish(2, building_id)
+
+
+@rpc("any_peer", "call_remote", "reliable")
 func cmd_train(building_id: int, def_id: StringName) -> void:
 	if _cmd_pid() == 2 and sim != null:
 		sim.handle_train(2, building_id, def_id)
@@ -307,6 +359,10 @@ func _client_connected() -> bool:
 
 func bc_spawn(id: int, def_id: StringName, owner_pid: int, pos: Vector2) -> void:
 	if _client_connected():
+		# gorunmez mayin: host'un (P1) mayini istemciye HIC gonderilmez
+		# (istemci P2'nin kendi mayinlari normal gider)
+		if owner_pid == 1 and D.building(def_id).get("mine", false):
+			return
 		sv_spawn.rpc_id(client_peer_id, id, def_id, owner_pid, pos)
 
 
@@ -424,7 +480,7 @@ func _apply_event(kind: int, args: Array) -> void:
 			Bus.war_changed.emit(args[0], args[1])
 		D.Ev.DEPLETED:
 			var cell: Vector2i = args[0]
-			GameState.grid_set(cell, D.Tile.GRASS)
+			GameState.grid_set(cell, args[1] if args.size() > 1 else D.Tile.GRASS)
 			var scene := get_tree().current_scene
 			if scene != null and scene.has_method("on_tile_depleted"):
 				scene.on_tile_depleted(cell)
@@ -446,6 +502,10 @@ func _apply_event(kind: int, args: Array) -> void:
 			var scene := get_tree().current_scene
 			if scene != null and scene.has_method("spawn_fx"):
 				scene.spawn_fx(&"explosion", args[0], args[1])
+		D.Ev.MISS_FX:
+			var scene := get_tree().current_scene
+			if scene != null and scene.has_method("spawn_fx"):
+				scene.spawn_fx(&"dirt", args[0])
 
 
 func _apply_game_over(winner: int, reason: int) -> void:

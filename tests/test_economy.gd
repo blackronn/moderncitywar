@@ -9,8 +9,8 @@ const Sim := preload("res://scripts/sim/sim.gd")
 
 func run() -> Array:
 	var errs: Array = []
-	# seed % 3 == 0 -> NEHIR tipi (su-ustune-insa senaryosu nehir ister)
-	var g := MapGen.generate(12)
+	# seed % 5 == 0 -> NEHIR tipi (su-ustune-insa senaryosu nehir ister)
+	var g := MapGen.generate(40)
 	var grid: PackedInt32Array = g["grid"]
 	var p := Pathing.new()
 	p.setup(grid)

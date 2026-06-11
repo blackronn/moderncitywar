@@ -13,6 +13,9 @@ const SRC_IDS := {
 	D.Tile.BRIDGE: 2,
 	D.Tile.FOREST: 3,
 	D.Tile.STONE: 4,
+	D.Tile.GOLD: 5,
+	D.Tile.SNOW: 6,
+	D.Tile.HILL: 7,
 }
 const KIND_NAMES := {
 	D.Tile.GRASS: &"grass",
@@ -20,6 +23,9 @@ const KIND_NAMES := {
 	D.Tile.BRIDGE: &"bridge",
 	D.Tile.FOREST: &"forest",
 	D.Tile.STONE: &"stone",
+	D.Tile.GOLD: &"gold",
+	D.Tile.SNOW: &"snow",
+	D.Tile.HILL: &"hill",
 }
 
 
@@ -48,6 +54,10 @@ static func build_tileset() -> TileSet:
 static func paint(terrain: TileMapLayer, features: TileMapLayer, grid: PackedInt32Array) -> void:
 	terrain.clear()
 	features.clear()
+	# kar haritasinda zemin kar; ozellikler (orman/tas/altin) seffaf bindirme
+	var snow_map: bool = GameState.map_type == D.MapType.SNOW
+	var ground_kind: int = D.Tile.SNOW if snow_map else D.Tile.GRASS
+	var ground_name: StringName = &"snow" if snow_map else &"grass"
 	for y in D.MAP_H:
 		for x in D.MAP_W:
 			var cell := Vector2i(x, y)
@@ -57,12 +67,18 @@ static func paint(terrain: TileMapLayer, features: TileMapLayer, grid: PackedInt
 					terrain.set_cell(cell, SRC_IDS[D.Tile.WATER], Vector2i(0, _variant(cell, &"water")))
 				D.Tile.BRIDGE:
 					terrain.set_cell(cell, SRC_IDS[D.Tile.BRIDGE], Vector2i(0, _variant(cell, &"bridge")))
+				D.Tile.HILL:
+					terrain.set_cell(cell, SRC_IDS[D.Tile.HILL], Vector2i(0, _variant(cell, &"hill")))
+				D.Tile.SNOW:
+					terrain.set_cell(cell, SRC_IDS[D.Tile.SNOW], Vector2i(0, _variant(cell, &"snow")))
 				_:
-					terrain.set_cell(cell, SRC_IDS[D.Tile.GRASS], Vector2i(0, _variant(cell, &"grass")))
+					terrain.set_cell(cell, SRC_IDS[ground_kind], Vector2i(0, _variant(cell, ground_name)))
 			if t == D.Tile.FOREST:
 				features.set_cell(cell, SRC_IDS[D.Tile.FOREST], Vector2i(0, _variant(cell, &"forest")))
 			elif t == D.Tile.STONE:
 				features.set_cell(cell, SRC_IDS[D.Tile.STONE], Vector2i(0, _variant(cell, &"stone")))
+			elif t == D.Tile.GOLD:
+				features.set_cell(cell, SRC_IDS[D.Tile.GOLD], Vector2i(0, _variant(cell, &"gold")))
 
 
 static func _variant(cell: Vector2i, kname: StringName) -> int:

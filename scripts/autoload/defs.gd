@@ -4,7 +4,7 @@ extends Node
 ## preload edip dogrudan kullanir. Sim dosyalari da autoload yerine
 ## `const D := preload(...)` ile erisir.
 
-const VERSION := "0.3.0"
+const VERSION := "0.4.0"
 
 # --- zaman / ag ---
 const TICK_RATE := 30
@@ -19,6 +19,7 @@ const MAP_H := 48
 const TILE := 16
 const BUILD_RADIUS_TILES := 10       # yeni bina, mevcut kendi binandan en fazla bu kadar uzakta
 const SPAWN_CLEAR_RADIUS := 5        # baslangic bolgesi temiz cim yaricapi
+const NEUTRAL_HALF_W := 4            # tarafsiz bolge: orta hattan iki yana bu kadar (altin burada)
 
 # --- zafer ---
 const METROPOLIS_POP := 40
@@ -32,11 +33,11 @@ const GATHER_RETARGET_T := 6         # kaynak tukenince bu yaricapta yenisi aran
 const MAX_BUILDERS := 3              # ayni insaata en fazla isci
 const TRAIN_QUEUE_MAX := 5
 
-enum Tile { GRASS, WATER, BRIDGE, FOREST, STONE }
+enum Tile { GRASS, WATER, BRIDGE, FOREST, STONE, GOLD, SNOW, HILL }
 enum Klass { INFANTRY, ARMOR, BUILDING }
 enum War { PEACE, COUNTDOWN, WAR }
-enum MapType { RIVER, LAKE, PLAINS }
-enum Ev { MATCH_STARTED, WAR_STATE, DEPLETED, BUILD_REJECTED, TRACER, TOAST_KEY, LEVEL, IMPACT }
+enum MapType { RIVER, LAKE, PLAINS, SNOW, VALLEY }
+enum Ev { MATCH_STARTED, WAR_STATE, DEPLETED, BUILD_REJECTED, TRACER, TOAST_KEY, LEVEL, IMPACT, MISS_FX }
 enum Reason { DESTRUCTION, METROPOLIS, OPPONENT_LEFT }
 enum Reject { NO_RES, BAD_SPOT, TOO_FAR, POP_FULL, BLOCKED, QUEUE_FULL, PEACE, INVALID, MAX_LEVEL, BORDER }
 
@@ -52,33 +53,59 @@ const FLAG_PRODUCING := 16
 const FLAG_HEALING := 32
 
 # hangi tile hangi kaynagi verir + saniyelik toplama hizi
-const TILE_RES := {Tile.FOREST: "wood", Tile.STONE: "stone"}
-const GATHER_RATES := {Tile.FOREST: 1.0, Tile.STONE: 0.75}
+const TILE_RES := {Tile.FOREST: "wood", Tile.STONE: "stone", Tile.GOLD: "money"}
+const GATHER_RATES := {Tile.FOREST: 1.0, Tile.STONE: 0.75, Tile.GOLD: 0.6}
+const GOLD_AMOUNT := 150.0           # tarafsiz bolgedeki altin rezervi (hucre basina)
+
+# arazi hiz carpani: engebeye gore hareket kabiliyeti
+const TILE_SPEED := {
+	Tile.GRASS: 1.0, Tile.BRIDGE: 1.0, Tile.FOREST: 0.85, Tile.STONE: 0.8,
+	Tile.GOLD: 0.85, Tile.SNOW: 0.75, Tile.HILL: 0.55, Tile.WATER: 1.0,
+}
+const BUILDABLE_TILES := [Tile.GRASS, Tile.SNOW]
+const MISS_SPREAD_T := 1.3           # iska eden merminin sapma yaricapi (tile)
 
 # --- birimler ---
 # speed_t: tile/sn, range_t/aggro_t: tile, cooldown_s: atislar arasi sn, train_s: uretim sn
 const UNITS := {
 	&"worker": {
 		"cost": {"food": 30}, "hp": 60, "dmg": 0, "range_t": 0.0, "cooldown_s": 0.0,
-		"speed_t": 2.5, "pop": 1, "klass": Klass.INFANTRY, "train_s": 8.0, "aggro_t": 0.0,
+		"speed_t": 2.9, "pop": 1, "klass": Klass.INFANTRY, "train_s": 8.0, "aggro_t": 0.0,
 	},
 	&"rifleman": {
 		"cost": {"food": 40, "money": 20}, "hp": 90, "dmg": 8, "range_t": 3.0, "cooldown_s": 1.0,
 		"speed_t": 2.2, "pop": 1, "klass": Klass.INFANTRY, "train_s": 8.0, "aggro_t": 5.0,
+		"miss": 0.15,
 	},
 	&"sniper": {
 		"cost": {"food": 50, "money": 50}, "hp": 55, "dmg": 22, "range_t": 6.0, "cooldown_s": 2.5,
 		"speed_t": 2.0, "pop": 1, "klass": Klass.INFANTRY, "train_s": 10.0, "aggro_t": 6.0,
+		"miss": 0.08,
 	},
 	&"rpg": {
 		"cost": {"food": 60, "money": 60}, "hp": 70, "dmg": 30, "range_t": 4.0, "cooldown_s": 3.0,
 		"speed_t": 1.8, "pop": 1, "klass": Klass.INFANTRY, "train_s": 12.0, "aggro_t": 5.0,
-		"splash_t": 1.2,   # alan hasari yaricapi (tile); cevredekilere %50
+		"splash_t": 1.2, "miss": 0.2,   # alan hasari yaricapi (tile); cevredekilere %50
+	},
+	&"mg": {
+		"cost": {"food": 70, "money": 40}, "hp": 100, "dmg": 5, "range_t": 3.5, "cooldown_s": 0.25,
+		"speed_t": 1.9, "pop": 2, "klass": Klass.INFANTRY, "train_s": 12.0, "aggro_t": 5.0,
+		"miss": 0.25,   # yayilim atesi: cok mermi, cok iska
+	},
+	&"commando": {
+		"cost": {"food": 80, "money": 60}, "hp": 120, "dmg": 14, "range_t": 1.5, "cooldown_s": 0.8,
+		"speed_t": 3.0, "pop": 2, "klass": Klass.INFANTRY, "train_s": 14.0, "aggro_t": 5.0,
+		"miss": 0.1,    # hizli yakin baskin birimi
+	},
+	&"mortar": {
+		"cost": {"food": 60, "money": 80}, "hp": 60, "dmg": 35, "range_t": 7.5, "cooldown_s": 4.0,
+		"speed_t": 1.6, "pop": 2, "klass": Klass.INFANTRY, "train_s": 14.0, "aggro_t": 7.0,
+		"splash_t": 1.3, "arc": true, "scatter_t": 0.9,   # mermi hedef cevresine sacilir
 	},
 	&"tank": {
 		"cost": {"money": 150, "stone": 80}, "hp": 450, "dmg": 24, "range_t": 4.0, "cooldown_s": 2.0,
 		"speed_t": 1.4, "pop": 3, "klass": Klass.ARMOR, "train_s": 15.0, "aggro_t": 5.0,
-		"splash_t": 1.0,
+		"splash_t": 1.0, "miss": 0.15,
 	},
 	&"healer": {
 		"cost": {"food": 50, "money": 30}, "hp": 70, "dmg": 0, "range_t": 2.5, "cooldown_s": 0.0,
@@ -111,31 +138,53 @@ const BUILDINGS := {
 		"up_cost": {"wood": 60, "stone": 30}, "up_rate": 0.5,
 	},
 	&"lumber_camp": {
-		"cost": {"wood": 40, "money": 20}, "hp": 350, "size": Vector2i(1, 1), "build_s": 18.0,
+		"cost": {"wood": 80, "money": 30}, "hp": 650, "size": Vector2i(2, 2), "build_s": 22.0,
 		"rate": {"wood": 0.4},
 		"up_cost": {"money": 40}, "up_rate": 0.5,
 	},
 	&"quarry": {
-		"cost": {"wood": 60, "money": 20}, "hp": 400, "size": Vector2i(1, 1), "build_s": 20.0,
+		"cost": {"wood": 90, "money": 30}, "hp": 700, "size": Vector2i(2, 2), "build_s": 24.0,
 		"rate": {"stone": 0.3},
 		"up_cost": {"money": 50}, "up_rate": 0.5,
 	},
 	&"barracks": {
 		"cost": {"wood": 100, "stone": 50}, "hp": 600, "size": Vector2i(2, 2), "build_s": 25.0,
-		"trains": [&"rifleman", &"sniper", &"rpg", &"healer"],
+		"trains": [&"rifleman", &"sniper", &"rpg", &"mg", &"commando", &"healer"],
 		"up_cost": {"wood": 80, "stone": 40}, "up_speed": 0.15,
 	},
 	&"factory": {
 		"cost": {"wood": 120, "stone": 100, "money": 100}, "hp": 800, "size": Vector2i(2, 2), "build_s": 35.0,
-		"trains": [&"tank"],
+		"trains": [&"tank", &"mortar"],
 		"up_cost": {"wood": 100, "stone": 60}, "up_speed": 0.15,
 	},
 	&"turret": {
 		"cost": {"stone": 60, "money": 40}, "hp": 500, "size": Vector2i(1, 1), "build_s": 20.0,
-		"dmg": 15, "range_t": 5.0, "cooldown_s": 1.2,
+		"dmg": 15, "range_t": 5.0, "cooldown_s": 1.2, "miss": 0.1,
 		"up_cost": {"stone": 50, "money": 30}, "up_dmg": 5,
 	},
+	&"bridge_seg": {
+		# adim adim kurulan kopru parcasi: su hucresine insa edilir, bitince
+		# hucre yurunebilir olur; saldirilabilir/yikilabilir (yikilirsa su geri gelir)
+		"cost": {"wood": 30, "stone": 10}, "hp": 250, "size": Vector2i(1, 1), "build_s": 8.0,
+		"bridge": true,
+	},
+	&"mine": {
+		# gorunmez mayin: rakip GORMEZ; savastayken ustune basan dusmana genis
+		# alan hasari (zirhliya x1.5 - tank avcisi). Tarafsiz bolgeye de kurulur.
+		"cost": {"money": 40, "stone": 20}, "hp": 80, "size": Vector2i(1, 1), "build_s": 4.0,
+		"mine": true, "m_dmg": 120, "m_trigger_t": 0.8, "m_splash_t": 1.5,
+	},
 }
+
+
+static func metro_types() -> int:
+	## Metropol hedefi icin gereken bina turu sayisi (kopru/mayin haric).
+	var n := 0
+	for id: StringName in BUILDINGS:
+		var b: Dictionary = BUILDINGS[id]
+		if not b.has("bridge") and not b.has("mine"):
+			n += 1
+	return n
 
 # hasar carpani: [saldiran klass][hedef klass]
 const DMG_MATRIX := {
@@ -143,6 +192,8 @@ const DMG_MATRIX := {
 	Klass.ARMOR: {Klass.INFANTRY: 1.5, Klass.ARMOR: 1.0, Klass.BUILDING: 1.0},
 	Klass.BUILDING: {Klass.INFANTRY: 1.0, Klass.ARMOR: 1.0, Klass.BUILDING: 0.0},
 }
+const MORTAR_VS_BUILDING := 1.5          # havanci -> bina
+
 # matrisi ezen ozel kurallar (combat.gd uygular) -- counter ucgeninin keskin kenarlari
 const SNIPER_VS_INFANTRY := 2.0          # niscanci -> piyade sinifi
 const RPG_VS_ARMOR_BUILDING := 2.5       # rpg -> zirh/bina

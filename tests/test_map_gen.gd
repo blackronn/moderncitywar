@@ -21,7 +21,7 @@ func run() -> Array:
 		errs.append("farkli seed ayni hash uretti (supheli)")
 
 	var seen_types := {}
-	for seed_v in [1, 42, 1337, 99999, 123456]:
+	for seed_v in [40, 41, 42, 43, 44, 1337]:
 		var g := MapGen.generate(seed_v)
 		var grid: PackedInt32Array = g["grid"]
 		var spawns: Array = g["spawns"]
@@ -40,13 +40,23 @@ func run() -> Array:
 		if not sym_ok:
 			errs.append("seed %d: harita aynali degil" % seed_v)
 
-		# spawn footprint'leri cim (tum tipler)
+		# spawn footprint'leri insa edilebilir zemin (cim/kar)
 		for s: Vector2i in spawns:
 			for dy in 2:
 				for dx in 2:
 					var t := grid[(s.y + dy) * D.MAP_W + (s.x + dx)]
-					if t != D.Tile.GRASS:
-						errs.append("seed %d: spawn %s cim degil" % [seed_v, s])
+					if not D.BUILDABLE_TILES.has(t):
+						errs.append("seed %d: spawn %s zemin degil" % [seed_v, s])
+
+		# tarafsiz bolgede altin rezervi olmali (tum tipler)
+		var gold_n := 0
+		var mid := D.MAP_W / 2
+		for y in D.MAP_H:
+			for x in range(mid - D.NEUTRAL_HALF_W, mid + D.NEUTRAL_HALF_W):
+				if grid[y * D.MAP_W + x] == D.Tile.GOLD:
+					gold_n += 1
+		if gold_n < 2:
+			errs.append("seed %d: tarafsiz bolgede altin yok (%d)" % [seed_v, gold_n])
 
 		# baglanti (tum tipler): spawnlar arasi yol var
 		var p := Pathing.new()
@@ -96,8 +106,26 @@ func run() -> Array:
 					if grid[i] == D.Tile.WATER or grid[i] == D.Tile.BRIDGE:
 						errs.append("seed %d: ova haritasinda su/kopru olmamali" % seed_v)
 						break
+			D.MapType.SNOW:
+				var has_snow := false
+				for i in grid.size():
+					if grid[i] == D.Tile.SNOW:
+						has_snow = true
+					elif grid[i] == D.Tile.WATER:
+						errs.append("seed %d: kar haritasinda su olmamali" % seed_v)
+						break
+				if not has_snow:
+					errs.append("seed %d: kar haritasinda kar yok" % seed_v)
+			D.MapType.VALLEY:
+				var has_hill := false
+				for i in grid.size():
+					if grid[i] == D.Tile.HILL:
+						has_hill = true
+						break
+				if not has_hill:
+					errs.append("seed %d: vadi haritasinda engebe yok" % seed_v)
 
-	if seen_types.size() < 3:
-		errs.append("test seed'leri 3 harita tipini de kapsamiyor (%d tip)" % seen_types.size())
+	if seen_types.size() < 5:
+		errs.append("test seed'leri 5 harita tipini de kapsamiyor (%d tip)" % seen_types.size())
 
 	return errs
