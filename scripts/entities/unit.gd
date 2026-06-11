@@ -58,7 +58,7 @@ func setup(p_id: int, p_def_id: StringName, p_owner: int) -> void:
 	sprite.hframes = Bible.UNIT_COLS
 	sprite.vframes = _anim_table.size()
 	sprite.offset = Vector2(0, 1)    # 24px karede ayaklar tile tabanina otursun
-	sprite.flip_h = owner_pid == 2   # P2 sola bakar; hareketle guncellenir
+	sprite.flip_h = owner_pid == 2 or owner_pid == 4   # sag yaka sola bakar; hareketle guncellenir
 	add_child(sprite)
 	_anim_t = randf() * 2.0          # ayni anda dogan birimler senkron sallanmasin
 

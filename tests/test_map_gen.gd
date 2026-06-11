@@ -149,4 +149,49 @@ func run() -> Array:
 	if seen_types.size() < 5:
 		errs.append("test seed'leri 5 harita tipini de kapsamiyor (%d tip)" % seen_types.size())
 
+	# === 4 OYUNCULU uretim: iki eksende simetri + 4 spawn + baglanti ===
+	for seed_v in [40, 41, 42, 43, 44]:
+		var g4 := MapGen.generate(seed_v, 4)
+		var grid4: PackedInt32Array = g4["grid"]
+		var spawns4: Array = g4["spawns"]
+		if spawns4.size() != 4:
+			errs.append("4p seed %d: 4 spawn bekleniyordu, %d" % [seed_v, spawns4.size()])
+			continue
+		# determinizm
+		if g4["hash"] != MapGen.generate(seed_v, 4)["hash"]:
+			errs.append("4p seed %d: deterministik degil" % seed_v)
+		# x VE y simetrisi
+		for y in D.MAP_H:
+			for x in D.MAP_W:
+				if grid4[y * D.MAP_W + x] != grid4[y * D.MAP_W + (D.MAP_W - 1 - x)]:
+					errs.append("4p seed %d: x-aynasi bozuk" % seed_v)
+					y = D.MAP_H
+					break
+		for y in range(0, D.MAP_H / 2):
+			for x in D.MAP_W:
+				if grid4[y * D.MAP_W + x] != grid4[(D.MAP_H - 1 - y) * D.MAP_W + x]:
+					errs.append("4p seed %d: y-aynasi bozuk" % seed_v)
+					y = D.MAP_H
+					break
+		# 4 spawn da insa edilebilir zemin
+		for s: Vector2i in spawns4:
+			for dy in 2:
+				for dx in 2:
+					var t4 := grid4[(s.y + dy) * D.MAP_W + (s.x + dx)]
+					if not D.BUILDABLE_TILES.has(t4):
+						errs.append("4p seed %d: spawn %s zemin degil" % [seed_v, s])
+		# altin var ve TUM harita baglantili (savas grid'i): P1 -> P3 ve P1 -> P2
+		var p4 := Pathing.new()
+		p4.setup(grid4, 4)
+		if p4.find(spawns4[0], spawns4[2]).is_empty():
+			errs.append("4p seed %d: ust-alt baglanti yok" % seed_v)
+		if p4.find(spawns4[0], spawns4[1]).is_empty():
+			errs.append("4p seed %d: sol-sag baglanti yok" % seed_v)
+		var gold4 := 0
+		for i in grid4.size():
+			if grid4[i] == D.Tile.GOLD:
+				gold4 += 1
+		if gold4 < 2:
+			errs.append("4p seed %d: altin yok" % seed_v)
+
 	return errs

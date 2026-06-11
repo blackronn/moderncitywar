@@ -38,7 +38,9 @@ func start_match() -> void:
 			elif t == D.Tile.GOLD:
 				# tarafsiz bolge altini: stok olmadan dogup aninda "tukeniyordu"
 				node_res[Vector2i(x, y)] = D.GOLD_AMOUNT
-	for pid in [1, 2]:
+	for pid in GameState.player_ids():
+		if GameState.eliminated.has(pid):
+			continue   # el sikismada kacan koltuk bos baslar
 		var tl: Vector2i = GameState.spawns[pid - 1]
 		spawn_building(&"city_hall", pid, tl, true)
 		var wc: Vector2i = pathing.nearest_free(tl + Vector2i(1, 2), 4)
@@ -48,8 +50,9 @@ func start_match() -> void:
 	Net.ev(D.Ev.MATCH_STARTED)
 	# mac BARISTA baslar: sinirlar kapali, saldiri yok; "Savas Ilan Et" ->
 	# 30 sn geri sayim -> savas (sinirlar acilir, catisma serbest)
-	Net.bc_resources(1)
-	Net.bc_resources(2)
+	for pid in GameState.player_ids():
+		Bus.resources_changed.emit(pid)   # host HUD'u da ilk degerleri gorsun
+		Net.bc_resources(pid)
 
 
 func _physics_process(delta: float) -> void:
@@ -65,10 +68,9 @@ func _physics_process(delta: float) -> void:
 	_tick_mines()
 	if tick % 15 == 0 and _res_dirty:
 		_res_dirty = false
-		Bus.resources_changed.emit(1)
-		Bus.resources_changed.emit(2)
-		Net.bc_resources(1)
-		Net.bc_resources(2)
+		for pid in GameState.player_ids():
+			Bus.resources_changed.emit(pid)
+			Net.bc_resources(pid)
 	if tick % D.TICK_RATE == 0:
 		_check_victory()
 	if tick % D.SNAPSHOT_EVERY_TICKS == 0:
@@ -117,12 +119,16 @@ func despawn(node: Node, reason: int) -> void:
 # === komut isleyiciler ===
 
 func handle_move(pid: int, ids: PackedInt32Array, target: Vector2) -> void:
+	if GameState.eliminated.has(pid):
+		return
 	var cell := _clamp_half(pid, _px_to_cell(target), true)
 	for u in _owned_units(pid, ids):
 		_set_move(u, cell)
 
 
 func handle_gather(pid: int, ids: PackedInt32Array, cell: Vector2i) -> void:
+	if GameState.eliminated.has(pid):
+		return
 	cell = _clamp_half(pid, cell, true)
 	var t := GameState.grid_at(cell)
 	if not D.TILE_RES.has(t):
@@ -146,46 +152,41 @@ func _half_pid(pid: int) -> int:
 
 
 func _clamp_half(pid: int, c: Vector2i, toast: bool = false) -> Vector2i:
-	## Baristayken hedefi kendi yari + tarafsiz bant icine ceker.
+	## Baristayken hedefi oyuncunun bolgesi (yari/ceyrek + tarafsiz bant) icine ceker.
 	if not _at_peace():
 		return c
-	var mid := D.MAP_W / 2
-	var out := c
-	if pid == 1 and c.x >= mid + D.NEUTRAL_HALF_W:
-		out = Vector2i(mid + D.NEUTRAL_HALF_W - 1, c.y)
-	elif pid == 2 and c.x < mid - D.NEUTRAL_HALF_W:
-		out = Vector2i(mid - D.NEUTRAL_HALF_W, c.y)
+	var out := D.zone_clamp(pid, c, GameState.player_count)
 	if toast and out != c:
 		Net.reject_to(pid, D.Reject.BORDER)
 	return out
 
 
 func handle_build(pid: int, def_id: StringName, top_left: Vector2i, builders: PackedInt32Array) -> void:
+	if GameState.eliminated.has(pid):
+		return
 	if not D.is_building(def_id) or def_id == &"city_hall":
 		Net.reject_to(pid, D.Reject.INVALID)
 		return
 	var bdef := D.building(def_id)
 	var afford: bool = GameState.can_afford(pid, bdef["cost"])
-	var mid := D.MAP_W / 2
-	# bolge sinirlari: normal binalar baristayken KENDI yarisinda; mayin, kopru
-	# ve siper tarafsiz banda da kurulabilir (altin yolu / nehir gecisi / cephe)
+	# bolge sinirlari: normal binalar baristayken KENDI bolgesinde (tarafsiz
+	# bant HARIC); mayin, kopru ve siper tarafsiz banda da kurulabilir
+	# (altin yolu / nehir gecisi / cephe)
 	var reach_neutral: bool = bdef.has("mine") or bdef.has("bridge") or bdef.has("cover")
-	var bmin := -1
-	var bmax := 9999
+	var zone_pid := 0
+	var zone_neutral := true
 	if _at_peace():
-		if pid == 1:
-			bmax = (mid + D.NEUTRAL_HALF_W - 1) if reach_neutral else (mid - D.NEUTRAL_HALF_W - 1)
-		else:
-			bmin = (mid - D.NEUTRAL_HALF_W) if reach_neutral else (mid + D.NEUTRAL_HALF_W)
+		zone_pid = pid
+		zone_neutral = reach_neutral
 	var verdict: int
 	if bdef.has("bridge"):
-		verdict = _validate_bridge(top_left, afford, bmin, bmax)
+		verdict = _validate_bridge(top_left, afford, zone_pid, zone_neutral)
 	elif bdef.has("mine") or bdef.has("cover"):
-		verdict = _validate_mine(top_left, afford, bmin, bmax)
+		verdict = _validate_mine(top_left, afford, zone_pid, zone_neutral)
 	else:
 		verdict = validate_placement(
 			GameState.grid, pathing, _unit_cells(), _own_building_rects(pid), bdef, top_left,
-			afford, bmin, bmax)
+			afford, zone_pid, zone_neutral, GameState.player_count)
 	if verdict != -1:
 		Net.reject_to(pid, verdict)
 		return
@@ -199,11 +200,20 @@ func handle_build(pid: int, def_id: StringName, top_left: Vector2i, builders: Pa
 			_assign_build(u, b)
 
 
-func _validate_bridge(cell: Vector2i, afford: bool, bmin: int, bmax: int) -> int:
+static func _zone_ok(cell: Vector2i, zone_pid: int, allow_neutral: bool, players: int) -> bool:
+	## zone_pid 0 = sinir yok (savas). Aksi halde baris bolgesi kontrolu.
+	if zone_pid == 0:
+		return true
+	if allow_neutral:
+		return D.in_zone(zone_pid, cell, players)
+	return D.in_home(zone_pid, cell, players)
+
+
+func _validate_bridge(cell: Vector2i, afford: bool, zone_pid: int, allow_neutral: bool) -> int:
 	## Kopru parcasi: SU hucresine, yurunebilir bir komsuya bitisik (adim adim).
 	if GameState.grid_at(cell) != D.Tile.WATER:
 		return D.Reject.BAD_SPOT
-	if cell.x < bmin or cell.x > bmax:
+	if not _zone_ok(cell, zone_pid, allow_neutral, GameState.player_count):
 		return D.Reject.BORDER
 	for b in _buildings():
 		if b.def.has("bridge") and b.cell == cell:
@@ -232,13 +242,13 @@ func _bridge_entity_at(cell: Vector2i) -> Node:
 	return null
 
 
-func _validate_mine(cell: Vector2i, afford: bool, bmin: int, bmax: int) -> int:
+func _validate_mine(cell: Vector2i, afford: bool, zone_pid: int, allow_neutral: bool) -> int:
 	## Mayin/siper: zemine, bina ustune degil; sehir yaricapi kurali YOK
 	## (ileri hatta kurulur). Ayni hucrede ikinci mayin/siper olamaz.
 	var t := GameState.grid_at(cell)
 	if not D.BUILDABLE_TILES.has(t):
 		return D.Reject.BAD_SPOT
-	if cell.x < bmin or cell.x > bmax:
+	if not _zone_ok(cell, zone_pid, allow_neutral, GameState.player_count):
 		return D.Reject.BORDER
 	if pathing.is_solid(cell):
 		return D.Reject.BLOCKED
@@ -261,6 +271,8 @@ func _in_cover(u: Node) -> bool:
 
 func handle_demolish(pid: int, building_id: int) -> void:
 	## Kendi binani yik (kopru dahil). Belediye yikilamaz.
+	if GameState.eliminated.has(pid):
+		return
 	var b: Node = GameState.ent(building_id)
 	if b == null or not b.def.has("size") or b.owner_pid != pid or b.def_id == &"city_hall":
 		return
@@ -269,6 +281,8 @@ func handle_demolish(pid: int, building_id: int) -> void:
 
 func handle_assign_build(pid: int, ids: PackedInt32Array, building_id: int) -> void:
 	## Yarim kalmis kendi insaatina isci atama (sag tikla devam etme).
+	if GameState.eliminated.has(pid):
+		return
 	var b: Node = GameState.ent(building_id)
 	if b == null or not b.def.has("size") or b.owner_pid != pid or b.is_complete():
 		return
@@ -278,6 +292,8 @@ func handle_assign_build(pid: int, ids: PackedInt32Array, building_id: int) -> v
 
 
 func handle_upgrade(pid: int, building_id: int) -> void:
+	if GameState.eliminated.has(pid):
+		return
 	var b: Node = GameState.ent(building_id)
 	if b == null or not b.def.has("size") or b.owner_pid != pid or not b.is_complete():
 		Net.reject_to(pid, D.Reject.INVALID)
@@ -302,6 +318,8 @@ func handle_upgrade(pid: int, building_id: int) -> void:
 
 
 func handle_train(pid: int, building_id: int, def_id: StringName) -> void:
+	if GameState.eliminated.has(pid):
+		return
 	var b: Node = GameState.ent(building_id)
 	if b == null or not b.def.has("size") or b.owner_pid != pid or not b.is_complete():
 		Net.reject_to(pid, D.Reject.INVALID)
@@ -341,6 +359,8 @@ func handle_cancel_train(pid: int, building_id: int, index: int) -> void:
 
 
 func handle_attack(pid: int, ids: PackedInt32Array, target_id: int) -> void:
+	if GameState.eliminated.has(pid):
+		return
 	if GameState.war_state != D.War.WAR:
 		Net.reject_to(pid, D.Reject.PEACE)
 		return
@@ -356,11 +376,14 @@ func handle_attack(pid: int, ids: PackedInt32Array, target_id: int) -> void:
 
 
 func handle_declare_war(pid: int) -> void:
+	## Savas ilani HERKESE karsi: geri sayim sonrasi serbest catisma (FFA).
+	if GameState.eliminated.has(pid):
+		return
 	if GameState.war_state != D.War.PEACE:
 		return
 	Net.ev(D.Ev.WAR_STATE, [D.War.COUNTDOWN, D.WAR_COUNTDOWN_S])
-	Net.toast_to(pid, &"war_declared_by_you")
-	Net.toast_to(GameState.enemy_of(pid), &"war_declared_by_enemy")
+	for other in GameState.player_ids():
+		Net.toast_to(other, &"war_declared_by_you" if other == pid else &"war_declared_by_enemy")
 
 
 func force_game_over(winner: int, reason: int) -> void:
@@ -371,16 +394,16 @@ func force_game_over(winner: int, reason: int) -> void:
 
 static func validate_placement(grid: PackedInt32Array, p_pathing, unit_cells: Array,
 		own_rects: Array, bdef: Dictionary, top_left: Vector2i, afford: bool,
-		min_x := -1, max_x := 9999) -> int:
+		zone_pid := 0, allow_neutral := true, players := 2) -> int:
 	## -1 = gecerli, aksi halde D.Reject.* nedeni.
-	## min_x/max_x: baris sinirlari (kendi yarin disina insaat yok).
+	## zone_pid > 0: baris sinirlari (kendi bolgen disina insaat yok).
 	var size: Vector2i = bdef["size"]
 	for dy in size.y:
 		for dx in size.x:
 			var c := top_left + Vector2i(dx, dy)
 			if c.x < 0 or c.y < 0 or c.x >= D.MAP_W or c.y >= D.MAP_H:
 				return D.Reject.BAD_SPOT
-			if c.x < min_x or c.x > max_x:
+			if not _zone_ok(c, zone_pid, allow_neutral, players):
 				return D.Reject.BORDER
 			if not D.BUILDABLE_TILES.has(grid[c.y * D.MAP_W + c.x]):
 				return D.Reject.BAD_SPOT
@@ -601,11 +624,10 @@ func _tick_mines() -> void:
 				break
 		if not fired:
 			continue
-		var victim_pid: int = GameState.enemy_of(m.owner_pid)
 		Net.ev(D.Ev.IMPACT, [m.position, 1.6])
 		var victims: Array = []
 		for o in GameState.entities.values():
-			if o.owner_pid != victim_pid:
+			if o.owner_pid == m.owner_pid:
 				continue
 			if o.position.distance_to(m.position) / float(D.TILE) <= m.def["m_splash_t"]:
 				var dmg: float = m.def["m_dmg"]
@@ -753,7 +775,23 @@ func _kill(tgt: Node) -> void:
 	var owner: int = tgt.owner_pid
 	despawn(tgt, 1)
 	if was_hall and GameState.result.is_empty():
-		Net.game_over(GameState.enemy_of(owner), D.Reason.DESTRUCTION)
+		eliminate_player(owner, false)
+
+
+func eliminate_player(pid: int, by_disconnect: bool) -> void:
+	## Belediyesi dusen / baglantisi kopan oyuncu ELENIR: tum varliklari
+	## kaldirilir; hayatta tek oyuncu kalirsa mac biter.
+	if GameState.eliminated.has(pid) or not GameState.result.is_empty():
+		return
+	GameState.eliminated[pid] = true
+	Net.ev(D.Ev.ELIMINATED, [pid])
+	for e in GameState.entities.values().duplicate():
+		if e.owner_pid == pid and GameState.entities.has(e.id):
+			despawn(e, 2)
+	var alive: Array = GameState.alive_ids()
+	if alive.size() == 1:
+		Net.game_over(alive[0],
+			D.Reason.OPPONENT_LEFT if by_disconnect else D.Reason.DESTRUCTION)
 
 
 static func attack_damage(att_id: StringName, att: Dictionary, def_id: StringName,
@@ -785,11 +823,10 @@ func _dist_t(a: Node, b: Node) -> float:
 
 
 func _nearest_enemy_unit(e: Node, range_t: float) -> Node:
-	var enemy := GameState.enemy_of(e.owner_pid)
 	var best: Node = null
 	var bd := 1e9
 	for o in GameState.entities.values():
-		if o.owner_pid != enemy or not o.def.has("speed_t"):
+		if o.owner_pid == e.owner_pid or not o.def.has("speed_t"):
 			continue
 		var d := _dist_t(e, o)
 		if d <= range_t and d < bd:
@@ -799,14 +836,14 @@ func _nearest_enemy_unit(e: Node, range_t: float) -> Node:
 
 
 func _nearest_enemy(e: Node, range_t: float) -> Node:
-	## Menzildeki en yakin dusman; birimler binalara tercih edilir.
-	var enemy := GameState.enemy_of(e.owner_pid)
+	## Menzildeki en yakin dusman (sahibi farkli olan herkes — FFA);
+	## birimler binalara tercih edilir.
 	var best_u: Node = null
 	var bu := 1e9
 	var best_b: Node = null
 	var bb := 1e9
 	for o in GameState.entities.values():
-		if o.owner_pid != enemy:
+		if o.owner_pid == e.owner_pid:
 			continue
 		var d := _dist_t(e, o)
 		if d > range_t:
@@ -832,7 +869,7 @@ func _check_victory() -> void:
 	## (Yikim zaferi _kill aninda verilir.)
 	if not GameState.result.is_empty():
 		return
-	for pid in [1, 2]:
+	for pid in GameState.alive_ids():
 		if GameState.pop_used[pid] < D.METROPOLIS_POP:
 			continue
 		var have := {}
@@ -965,12 +1002,11 @@ func _retarget_gather(u: Node, from_c: Vector2i) -> void:
 func _nearest_node(from_c: Vector2i, tile_kind: int, pid: int) -> Vector2i:
 	var best := Vector2i(-1, -1)
 	var best_d := 9999
-	var mid := D.MAP_W / 2
 	for c: Vector2i in node_res:
 		if GameState.grid_at(c) != tile_kind:
 			continue
-		if _at_peace() and ((pid == 1 and c.x >= mid) or (pid == 2 and c.x < mid)):
-			continue   # baristayken sinir otesindeki kaynaga gidilmez
+		if _at_peace() and not D.in_zone(pid, c, GameState.player_count):
+			continue   # baristayken bolge disindaki kaynaga gidilmez
 		var dd := maxi(absi(c.x - from_c.x), absi(c.y - from_c.y))
 		if dd <= D.GATHER_RETARGET_T and dd < best_d:
 			best_d = dd
@@ -1080,7 +1116,7 @@ func _own_building_rects(pid: int) -> Array:
 
 
 func recount_pop() -> void:
-	for pid in [1, 2]:
+	for pid in GameState.player_ids():
 		var used := 0
 		var cap := 0
 		for e in GameState.entities.values():

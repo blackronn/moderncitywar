@@ -4,41 +4,60 @@ extends Node
 
 const D := preload("res://scripts/autoload/defs.gd")
 
-var my_pid := 1                      # 1 = host, 2 = istemci
+var my_pid := 1                      # 1 = host, 2..4 = istemciler (katilim sirasi)
+var player_count := 2                # bu mactaki oyuncu sayisi (2-4)
 var seed_v := 0
 var grid := PackedInt32Array()       # guncel harita (tukenmeler islenmis), D.Tile.*
 var map_type := 0                    # D.MapType.*
 var map_hash := 0
-var spawns: Array = []               # [Vector2i, Vector2i] belediye sol-ust koseleri
+var spawns: Array = []               # belediye sol-ust koseleri (oyuncu sirasiyla)
 var res := {}                        # pid -> {"wood": float, ...}
-var pop_used := {1: 0, 2: 0}
-var pop_cap := {1: 0, 2: 0}
+var pop_used := {}
+var pop_cap := {}
 var war_state := D.War.PEACE
 var war_t_left := 0.0
 var entities := {}                   # id -> Node (unit.gd / building.gd)
+var eliminated := {}                 # pid -> true (belediyesi dusen/ayrilan oyuncular)
 var result := {}                     # {"winner": pid, "reason": D.Reason.*}; bos = devam
 var match_running := false
 
 
-func reset(p_seed: int) -> void:
+func reset(p_seed: int, p_players := 2) -> void:
 	my_pid = my_pid  # pid'i Net yonetir; burada dokunma
+	player_count = clampi(p_players, 2, D.MAX_PLAYERS)
 	seed_v = p_seed
 	grid = PackedInt32Array()
 	map_type = 0
 	map_hash = 0
 	spawns = []
-	res = {1: D.START_RES.duplicate(true), 2: D.START_RES.duplicate(true)}
-	pop_used = {1: 0, 2: 0}
-	pop_cap = {1: 0, 2: 0}
+	res = {}
+	pop_used = {}
+	pop_cap = {}
+	for pid in player_ids():
+		res[pid] = D.START_RES.duplicate(true)
+		pop_used[pid] = 0
+		pop_cap[pid] = 0
 	war_state = D.War.PEACE
 	war_t_left = 0.0
 	entities = {}
+	eliminated = {}
 	result = {}
 	match_running = false
 
 
-func enemy_of(pid: int) -> int:
-	return 2 if pid == 1 else 1
+func player_ids() -> Array:
+	var out: Array = []
+	for pid in range(1, player_count + 1):
+		out.append(pid)
+	return out
+
+
+func alive_ids() -> Array:
+	var out: Array = []
+	for pid in player_ids():
+		if not eliminated.has(pid):
+			out.append(pid)
+	return out
 
 
 func my_res() -> Dictionary:

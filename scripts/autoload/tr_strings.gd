@@ -5,7 +5,7 @@ extends Node
 const S := {
 	# genel
 	&"app_title": "VOXGARD",
-	&"subtitle": "İKİ BELEDİYE BAŞKANI · TEK HARİTA",
+	&"subtitle": "BELEDİYE BAŞKANLARI SAVAŞI · 2-4 OYUNCU",
 	&"host_game": "Oyun Kur",
 	&"join_game": "Oyuna Katıl",
 	&"single_player": "Tek Kişilik (Keşif)",
@@ -23,6 +23,13 @@ const S := {
 	&"desync": "Harita uyuşmazlığı — bağlantı kesildi",
 	&"match_started": "Maç başladı! Bol şans başkanım.",
 	&"opponent_left": "Rakip oyundan ayrıldı",
+	&"start_match": "Maçı Başlat",
+	&"players_in_lobby": "Oyuncu: %d / %d",
+	&"waiting_host_start": "Host'un başlatması bekleniyor...",
+	&"need_two_players": "En az 2 oyuncu gerekli",
+	&"eliminated_you": "Şehrin düştü — ELENDİN!",
+	&"eliminated_player": "%d. oyuncu elendi!",
+	&"eliminated_title": "ELENDİN",
 
 	# kaynaklar
 	&"wood": "Odun",

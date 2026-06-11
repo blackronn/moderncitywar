@@ -12,12 +12,13 @@ static func seed_with_type(base: int, map_type: int) -> int:
 	return base - (base % 5) + clampi(map_type, 0, 4)
 
 
-static func generate(seed_v: int) -> Dictionary:
+static func generate(seed_v: int, players := 2) -> Dictionary:
 	var w := D.MAP_W
 	var h := D.MAP_H
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_v
 	var map_type := absi(seed_v) % 5   # seed harita tipini de belirler
+	var quad := players > 2            # 3-4 oyuncu: iki eksende aynali ceyrekler
 
 	var grid := PackedInt32Array()
 	grid.resize(w * h)
@@ -37,11 +38,13 @@ static func generate(seed_v: int) -> Dictionary:
 					grid[y * w + (cl - 1)] = D.Tile.WATER
 					grid[y * w + (cr + 1)] = D.Tile.WATER
 			# --- kopruler: 2-3 adet, aralarinda en az 8 satir ---
+			# (4 oyunculu macta UST yarida secilir; y-aynasi alta kopyalar)
 			var bridge_count := 2 + (rng.randi() % 2)
+			var by_max := (h / 2 - 4) if quad else (h - 7)
 			var tries := 0
 			while bridge_rows.size() < bridge_count and tries < 200:
 				tries += 1
-				var y := rng.randi_range(6, h - 7)
+				var y := rng.randi_range(6, by_max)
 				var ok := true
 				for prev in bridge_rows:
 					if absi(y - prev) < 8:
@@ -50,13 +53,25 @@ static func generate(seed_v: int) -> Dictionary:
 				if ok:
 					bridge_rows.append(y)
 			if bridge_rows.size() < bridge_count:
-				var fallback: Array[int] = [12, 24, 36]
+				var fallback: Array[int] = [12, 24, 36] if not quad else [8, 16]
 				bridge_rows.assign(fallback.slice(0, bridge_count))
 			bridge_rows.sort()
 			for y in bridge_rows:
 				for x in range(cl - 1, cr + 2):
 					if grid[y * w + x] == D.Tile.WATER:
 						grid[y * w + x] = D.Tile.BRIDGE
+			if quad:
+				# --- 4 oyuncu: YATAY nehir kolu da (hac) + sol yarida kopruler ---
+				for x in w:
+					grid[cl * w + x] = D.Tile.WATER
+					grid[cr * w + x] = D.Tile.WATER
+					if rng.randf() < 0.3:
+						grid[(cl - 1) * w + x] = D.Tile.WATER
+						grid[(cr + 1) * w + x] = D.Tile.WATER
+				for bx: int in [rng.randi_range(6, 12), rng.randi_range(14, cl - 4)]:
+					for y in range(cl - 1, cr + 2):
+						if grid[y * w + bx] == D.Tile.WATER:
+							grid[y * w + bx] = D.Tile.BRIDGE
 		D.MapType.LAKE:
 			# --- merkez gol: ust/alt kiyilardan dolasilir, kopru yok ---
 			var rx := 6.0 + rng.randf() * 4.0
@@ -93,10 +108,20 @@ static func generate(seed_v: int) -> Dictionary:
 			for _i in 4:
 				var hs := Vector2i(ridge_x + rng.randi_range(-2, 4), rng.randi_range(3, h - 4))
 				_walk_blob_kind(rng, grid, cl, hs, D.Tile.HILL, rng.randi_range(3, 6), D.Tile.GRASS)
+			if quad:
+				# 4 oyuncu: YATAY sirt da (gecitli) — ceyrekler arasi koridorlar
+				var ridge_y := cl - 9
+				var gx := rng.randi_range(6, 16)
+				for x in range(0, cl + 1):
+					if absi(x - gx) <= 2:
+						continue
+					for dy in 3:
+						grid[(ridge_y + dy) * w + x] = D.Tile.HILL
 
 	# --- spawn'lar: belediye 2x2'nin sol-ust kosesi ---
-	var spawn1 := Vector2i(4, h / 2 - 1)
-	var spawn2 := Vector2i(w - 4 - 2, h / 2 - 1)
+	# 2 oyuncu: orta hizada karsilikli; 3-4 oyuncu: dort kose (ceyrek merkezleri)
+	var spawn1 := Vector2i(4, h / 2 - 1) if not quad else Vector2i(4, h / 4 - 1)
+	var spawn2 := Vector2i(w - 4 - 2, spawn1.y)
 	var center1 := spawn1 + Vector2i(1, 1)
 
 	# --- garanti baslangic kaynaklari: spawn yakini orman + tas ---
@@ -120,9 +145,11 @@ static func generate(seed_v: int) -> Dictionary:
 	var mid := w / 2
 	match map_type:
 		D.MapType.RIVER:
-			# nehrin icinde 2 adacik: cevresi su, ustunde altin.
-			# kopru satirlarina carpmasin (koprunun ustune ada acilmasin)
-			for base_iy: int in [h / 2 - 9, h / 2 + 7]:
+			# nehrin icinde adaciklar: cevresi su, ustunde altin.
+			# kopru satirlarina carpmasin (koprunun ustune ada acilmasin).
+			# 4 oyuncuda tek ada UST kolda; y-aynasi alt koldakini uretir.
+			var bases: Array = [h / 4 + 3] if quad else [h / 2 - 9, h / 2 + 7]
+			for base_iy: int in bases:
 				var iy := base_iy
 				var guard := 0
 				while guard < 10 and _near_bridge(iy, bridge_rows):
@@ -177,9 +204,20 @@ static func generate(seed_v: int) -> Dictionary:
 		for x in range(0, cl + 1):
 			grid[y * w + (w - 1 - x)] = grid[y * w + x]
 
+	var spawns: Array = [spawn1, spawn2]
+	if quad:
+		# --- 4 oyuncu: ust yariyi alta da aynala (iki eksende simetri) ---
+		for y in range(0, h / 2):
+			for x in w:
+				grid[(h - 1 - y) * w + x] = grid[y * w + x]
+		# belediye 2x2 oldugundan alt spawn'lar y-aynasinda 1 kayar
+		var spawn3 := Vector2i(spawn1.x, h - 2 - spawn1.y)
+		var spawn4 := Vector2i(spawn2.x, h - 2 - spawn2.y)
+		spawns = [spawn1, spawn2, spawn3, spawn4]
+
 	return {
 		"grid": grid,
-		"spawns": [spawn1, spawn2],
+		"spawns": spawns,
 		"bridge_rows": bridge_rows,
 		"map_type": map_type,
 		"hash": hash(grid),

@@ -88,6 +88,7 @@ func _ready() -> void:
 	Bus.entity_level_changed.connect(_on_level_changed)
 	Bus.entity_spawned.connect(func(_n): _refresh_army())
 	Bus.entity_removed.connect(func(_i, _r): _refresh_army())
+	Bus.player_eliminated.connect(_on_eliminated)
 	_on_res(GameState.my_pid)
 	_on_war(GameState.war_state, GameState.war_t_left)
 	_refresh_army()
@@ -520,7 +521,7 @@ func _refresh_minimap() -> void:
 		if not e.visible:
 			continue   # rakip mayini minimap'te de gorunmez
 		var c := Vector2i((e.position / float(D.TILE)).floor())
-		var col: Color = UiKit.ACCENT_BLUE if e.owner_pid == 1 else UiKit.ACCENT_RED
+		var col: Color = D.PLAYER_COLORS.get(e.owner_pid, UiKit.ACCENT_RED)
 		var sz := 2 if e.def.has("size") else 1
 		for dy in sz:
 			for dx in sz:
@@ -696,6 +697,9 @@ func _refresh_panel() -> void:
 			fb.pressed.connect(_on_formation.bind(fi))
 			form_box.add_child(fb)
 
+	# insa menusu 2 satira tasabilir (11 kart): panel yuksekligi icerige gore
+	bottom.offset_top = -208.0 if has_worker else -124.0
+
 	if has_worker:
 		for bid in BUILDABLE:
 			var bdef := D.building(bid)
@@ -820,6 +824,18 @@ func _toast(msg: String) -> void:
 	tw.tween_interval(2.2)
 	tw.tween_property(chip, "modulate:a", 0.0, 0.45)
 	tw.tween_callback(chip.queue_free)
+
+
+func _on_eliminated(pid: int) -> void:
+	## FFA'da ara eleme: SEN elendiysen mac bitmeden yenilgi ekrani gelir
+	## (izlemeye devam edebilirsin; digerleri tek kisi kalana dek oynar).
+	if pid != GameState.my_pid or not GameState.result.is_empty():
+		return
+	end_overlay.visible = true
+	end_icon.texture = UiKit.icon_tex(&"skull")
+	end_title.text = Tr.t(&"eliminated_title")
+	end_title.add_theme_color_override("font_color", Color("#e0564a"))
+	end_reason.text = Tr.t(&"reason_destruction")
 
 
 func _on_game_over(winner: int, reason: int) -> void:

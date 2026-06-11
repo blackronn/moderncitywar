@@ -4,7 +4,9 @@
 #         catisma) | end (zafer ekrani)
 param(
     [string]$OutFile = 'screenshots\preview.png',
-    [ValidateSet('menu', 'preview', 'demo', 'end')][string]$Mode = 'preview'
+    [ValidateSet('menu', 'preview', 'demo', 'end')][string]$Mode = 'preview',
+    [int]$Seed = 0,      # 0 = varsayilan (DEFAULT_SEED); seed%5 harita tipi
+    [int]$Players = 0    # 0 = varsayilan (2); 4 = dort sehirli onizleme
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
@@ -24,6 +26,8 @@ $flags = @(switch ($Mode) {
     'demo'    { '--demo' }
     'end'     { '--preview'; '--end' }
 })
+if ($Seed -gt 0) { $flags += "--seed=$Seed" }
+if ($Players -gt 0) { $flags += "--players=$Players" }
 $gargs = @('--path', $root, '--') + $flags + @("--screenshot=$out")
 & $bin @gargs
 if ($LASTEXITCODE -ne 0) { Write-Host "Screenshot basarisiz (exit $LASTEXITCODE)"; exit 1 }

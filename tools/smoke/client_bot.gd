@@ -32,6 +32,12 @@ func _run() -> void:
 			_run_disconnect()
 		"metro":
 			pass   # _on_over bekler
+		"ffa":
+			# 4 oyunculu FFA: P2 savas ilan eder, P3/P4 izler; host yikar
+			if GameState.my_pid == 2:
+				await get_tree().create_timer(1.0).timeout
+				print("BOT_CLIENT P2 savas ilan ediyor")
+				Net.send_declare_war()
 
 
 func _run_disconnect() -> void:
@@ -66,7 +72,7 @@ func _run_war() -> void:
 func _army() -> Array:
 	var out: Array = []
 	for e in GameState.entities.values():
-		if e.owner_pid == 2 and e.def.has("speed_t") and e.def["dmg"] > 0:
+		if e.owner_pid == GameState.my_pid and e.def.has("speed_t") and e.def["dmg"] > 0:
 			out.append(e)
 	return out
 
@@ -87,6 +93,8 @@ func _on_over(winner: int, reason: int) -> void:
 			ok = winner == 2 and reason == D.Reason.DESTRUCTION
 		"metro":
 			ok = winner == 1 and reason == D.Reason.METROPOLIS
+		"ffa":
+			ok = winner == 1 and reason == D.Reason.DESTRUCTION
 		"disconnect":
 			return   # kacis senaryosunda game_over beklenmez
 	_finished = true

@@ -14,6 +14,8 @@ signal entity_removed(id: int, reason: int)
 signal entity_level_changed(id: int)
 signal game_over(winner_pid: int, reason: int)
 signal lobby_status(msg: String)
+signal lobby_players(count: int, max_p: int)
+signal player_eliminated(pid: int)
 signal net_error(msg: String)
 signal build_rejected(reason: int)
 

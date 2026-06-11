@@ -15,6 +15,8 @@ const Bible := preload("res://scripts/sim/bible.gd")
 const TEAM := {
 	1: {"main": "#3a78d8", "dark": "#27508f", "light": "#7fb0ff", "deep": "#173260"},
 	2: {"main": "#dc4636", "dark": "#9c2820", "light": "#ff8473", "deep": "#5e150f"},
+	3: {"main": "#3fa650", "dark": "#2a7338", "light": "#7fdf96", "deep": "#123f1f"},
+	4: {"main": "#9b59d0", "dark": "#6a3a93", "light": "#c79bef", "deep": "#3c1f5e"},
 }
 const SK := "#f1b487"
 const SKD := "#cd8a5b"
@@ -483,7 +485,7 @@ func _bake_units(root: String) -> void:
 	var fs := Bible.UNIT_FRAME
 	for unit_id: StringName in Bible.UNIT_ANIMS:
 		var table: Array = Bible.UNIT_ANIMS[unit_id]
-		for pid in [1, 2]:
+		for pid: int in TEAM:
 			var sheet := blank(Bible.UNIT_COLS * fs, table.size() * fs)
 			for row in table.size():
 				var frames: int = table[row][1]
@@ -848,7 +850,7 @@ func _bake_buildings(root: String) -> void:
 		var frames: int = meta[0]
 		var dt: float = meta[1]
 		var fpx := Bible.building_frame_px(id)
-		for pid in [1, 2]:
+		for pid: int in TEAM:
 			var sheet := blank(frames * fpx, fpx)
 			for i in frames:
 				var f := bake_building_frame(id, i * dt, pid)

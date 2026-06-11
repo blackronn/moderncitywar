@@ -4,7 +4,15 @@ extends Node
 ## preload edip dogrudan kullanir. Sim dosyalari da autoload yerine
 ## `const D := preload(...)` ile erisir.
 
-const VERSION := "0.5.0"
+const VERSION := "0.6.0"
+
+# --- oyuncular ---
+const MAX_PLAYERS := 4
+# takim renkleri (gen_bible TEAM paletlerinin "main" degerleriyle birebir)
+const PLAYER_COLORS := {
+	1: Color("#3a78d8"), 2: Color("#dc4636"),
+	3: Color("#3fa650"), 4: Color("#9b59d0"),
+}
 
 # --- zaman / ag ---
 const TICK_RATE := 30
@@ -37,7 +45,7 @@ enum Tile { GRASS, WATER, BRIDGE, FOREST, STONE, GOLD, SNOW, HILL, MOUNTAIN }
 enum Klass { INFANTRY, ARMOR, BUILDING }
 enum War { PEACE, COUNTDOWN, WAR }
 enum MapType { RIVER, LAKE, PLAINS, SNOW, VALLEY }
-enum Ev { MATCH_STARTED, WAR_STATE, DEPLETED, BUILD_REJECTED, TRACER, TOAST_KEY, LEVEL, IMPACT, MISS_FX }
+enum Ev { MATCH_STARTED, WAR_STATE, DEPLETED, BUILD_REJECTED, TRACER, TOAST_KEY, LEVEL, IMPACT, MISS_FX, ELIMINATED }
 enum Reason { DESTRUCTION, METROPOLIS, OPPONENT_LEFT }
 enum Reject { NO_RES, BAD_SPOT, TOO_FAR, POP_FULL, BLOCKED, QUEUE_FULL, PEACE, INVALID, MAX_LEVEL, BORDER }
 
@@ -183,6 +191,58 @@ const BUILDINGS := {
 		"cover": true, "cover_t": 0.9,
 	},
 }
+
+
+static func in_zone(pid: int, c: Vector2i, players: int) -> bool:
+	## Baris bolgesi: 2 oyunculu macta yarilar, 3-4 oyunculuda CEYREKLER.
+	## Tarafsiz bant (NEUTRAL_HALF_W) her zaman dahildir (altin orada).
+	## pid yerlesimi: 1 sol-ust, 2 sag-ust, 3 sol-alt, 4 sag-alt.
+	var mid := MAP_W / 2
+	if players <= 2:
+		return c.x < mid + NEUTRAL_HALF_W if pid == 1 else c.x >= mid - NEUTRAL_HALF_W
+	var midy := MAP_H / 2
+	var okx: bool = (c.x < mid + NEUTRAL_HALF_W) if (pid == 1 or pid == 3) \
+		else (c.x >= mid - NEUTRAL_HALF_W)
+	var oky: bool = (c.y < midy + NEUTRAL_HALF_W) if (pid == 1 or pid == 2) \
+		else (c.y >= midy - NEUTRAL_HALF_W)
+	return okx and oky
+
+
+static func in_home(pid: int, c: Vector2i, players: int) -> bool:
+	## Tarafsiz bant HARIC kendi bolgesi (normal binalar baristayken buraya).
+	var mid := MAP_W / 2
+	if players <= 2:
+		return c.x < mid - NEUTRAL_HALF_W if pid == 1 else c.x >= mid + NEUTRAL_HALF_W
+	var midy := MAP_H / 2
+	var okx: bool = (c.x < mid - NEUTRAL_HALF_W) if (pid == 1 or pid == 3) \
+		else (c.x >= mid + NEUTRAL_HALF_W)
+	var oky: bool = (c.y < midy - NEUTRAL_HALF_W) if (pid == 1 or pid == 2) \
+		else (c.y >= midy + NEUTRAL_HALF_W)
+	return okx and oky
+
+
+static func zone_clamp(pid: int, c: Vector2i, players: int) -> Vector2i:
+	## Hedef hucreyi oyuncunun baris bolgesinin icine ceker.
+	var mid := MAP_W / 2
+	var out := c
+	if players <= 2:
+		if pid == 1 and c.x >= mid + NEUTRAL_HALF_W:
+			out.x = mid + NEUTRAL_HALF_W - 1
+		elif pid == 2 and c.x < mid - NEUTRAL_HALF_W:
+			out.x = mid - NEUTRAL_HALF_W
+		return out
+	if pid == 1 or pid == 3:
+		if out.x >= mid + NEUTRAL_HALF_W:
+			out.x = mid + NEUTRAL_HALF_W - 1
+	elif out.x < mid - NEUTRAL_HALF_W:
+		out.x = mid - NEUTRAL_HALF_W
+	var midy := MAP_H / 2
+	if pid == 1 or pid == 2:
+		if out.y >= midy + NEUTRAL_HALF_W:
+			out.y = midy + NEUTRAL_HALF_W - 1
+	elif out.y < midy - NEUTRAL_HALF_W:
+		out.y = midy - NEUTRAL_HALF_W
+	return out
 
 
 static func metro_types() -> int:

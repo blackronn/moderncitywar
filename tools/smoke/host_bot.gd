@@ -4,12 +4,19 @@ extends Node
 ##     saldirisiyla yikilmayi bekler -> (2, DESTRUCTION) PASS
 ##   disconnect: hicbir sey yapmaz; istemci kacinca -> (1, OPPONENT_LEFT) PASS
 ##   metro: P1'e tam metropol kurar -> (1, METROPOLIS) PASS
+##   ffa: 4 oyuncu (3 istemci); savas baslayinca P3/P4/P2 belediyelerini
+##     sirayla yikar -> 3x ELIMINATED + (1, DESTRUCTION) PASS
+## Lobi akisi: yeterli istemci baglaninca host_start() cagrilir (lobideki
+## "Maci Baslat" butonunun yaptigi isin aynisi).
 
 const D := preload("res://scripts/autoload/defs.gd")
 const TIMEOUT_S := 110.0
 
 var scenario := "war"
 var _finished := false
+var _started := false
+var _ffa_seq := false
+var _elims := 0
 
 
 func _ready() -> void:
@@ -18,10 +25,28 @@ func _ready() -> void:
 			scenario = arg.get_slice("=", 1)
 	get_tree().create_timer(TIMEOUT_S).timeout.connect(_fail)
 	Bus.game_over.connect(_on_over)
+	multiplayer.peer_connected.connect(_on_peer)
+	if scenario == "ffa":
+		Bus.war_changed.connect(_on_war_ffa)
+		Bus.player_eliminated.connect(func(_pid): _elims += 1)
 	if GameState.match_running:
 		_run()
 	else:
 		Bus.match_started.connect(_run, CONNECT_ONE_SHOT)
+
+
+func _need_clients() -> int:
+	return 3 if scenario == "ffa" else 1
+
+
+func _on_peer(_id: int) -> void:
+	if _started or Net.peers.size() < _need_clients():
+		return
+	_started = true
+	# istemci oylarinin gelmesi icin kisa bekleme, sonra lobi baslatma
+	await get_tree().create_timer(0.8).timeout
+	print("BOT_HOST mac baslatiliyor (%d oyuncu)" % Net.player_total())
+	Net.host_start()
 
 
 func _run() -> void:
@@ -42,6 +67,30 @@ func _run() -> void:
 			print("BOT_HOST metropol kuruldu")
 		"disconnect":
 			print("BOT_HOST istemcinin kacmasini bekliyor")
+		"ffa":
+			print("BOT_HOST ffa: P2'nin savas ilani bekleniyor")
+
+
+func _on_war_ffa(state: int, _t: float) -> void:
+	## Savas basladi: belediyeleri sirayla yik — her biri ELIMINATED uretmeli,
+	## sonuncusunda tek kisi (P1) kalir ve mac biter.
+	if state != D.War.WAR or _ffa_seq or Net.sim == null:
+		return
+	_ffa_seq = true
+	await get_tree().create_timer(0.5).timeout
+	for victim in [3, 4, 2]:
+		if _finished:
+			return
+		_kill_hall(victim)
+		await get_tree().create_timer(0.8).timeout
+
+
+func _kill_hall(pid: int) -> void:
+	for e in GameState.entities.values():
+		if e.owner_pid == pid and e.def_id == &"city_hall":
+			Net.sim._apply_damage([[e, 99999.0]])
+			print("BOT_HOST P%d belediyesi yikildi" % pid)
+			return
 
 
 func _build_metropolis(sim: Node) -> void:
@@ -82,14 +131,16 @@ func _on_over(winner: int, reason: int) -> void:
 			ok = winner == 1 and reason == D.Reason.OPPONENT_LEFT
 		"metro":
 			ok = winner == 1 and reason == D.Reason.METROPOLIS
+		"ffa":
+			ok = winner == 1 and reason == D.Reason.DESTRUCTION and _elims >= 3
 	if ok:
 		print("SMOKE_PASS_HOST")
-		# sv_game_over paketinin istemciye ulasmasi icin cikmadan once bekle
+		# sv_game_over paketinin istemcilere ulasmasi icin cikmadan once bekle
 		# (aninda quit ENet kuyrugunu flush etmeden sureci oldurur)
 		await get_tree().create_timer(1.0).timeout
 		get_tree().quit(0)
 	else:
-		printerr("SMOKE_FAIL_HOST yanlis sonuc w=%d r=%d senaryo=%s" % [winner, reason, scenario])
+		printerr("SMOKE_FAIL_HOST yanlis sonuc w=%d r=%d elim=%d senaryo=%s" % [winner, reason, _elims, scenario])
 		get_tree().quit(1)
 
 

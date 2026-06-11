@@ -15,6 +15,8 @@ func run() -> Array:
 		errs.append("12 bina bekleniyordu, %d var" % D.BUILDINGS.size())
 	if D.COVER_MISS < 0.5 or D.COVER_MISS > 0.8:
 		errs.append("COVER_MISS makul aralikta degil")
+	if D.PLAYER_COLORS.size() != D.MAX_PLAYERS:
+		errs.append("PLAYER_COLORS %d oyuncu icermeli" % D.MAX_PLAYERS)
 	if D.metro_types() != 9:
 		errs.append("metro_types 9 olmali (kopru+mayin haric), %d" % D.metro_types())
 	# iska oranlari mantikli araliklarda

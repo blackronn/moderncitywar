@@ -4,6 +4,8 @@ extends Node
 ## RPC'ler dinamik node'larda degil hep /root/Net uzerinde yasar (iki ucta
 ## ayni NodePath sart); entity'ler paketlerde int id ile anilir.
 ## Host otoriterdir: istemci yalnizca cmd_* gonderir, simulasyonu host kosar.
+## 2-4 oyuncu: host pid 1; istemciler katilim sirasiyla pid 2..4 alir.
+## Mac, lobide host "Maci Baslat" deyince baslar (en az 2 oyuncu).
 
 const D := preload("res://scripts/autoload/defs.gd")
 const MapGen := preload("res://scripts/sim/map_gen.gd")
@@ -11,15 +13,15 @@ const MapGen := preload("res://scripts/sim/map_gen.gd")
 const PORT := 8910
 
 var net_active := false              # gercek baglanti var mi (offline onizleme = false)
-var client_peer_id := 0              # host tarafinda istemcinin ENet peer id'si
+var peers := {}                      # host: pid -> ENet peer id (katilim sirasi)
+var peer_votes := {}                 # host: pid -> harita oyu (-1 rastgele)
 var game_ready := false              # lokal game sahnesi sv_* almaya hazir mi
 var sim: Node = null                 # host'ta game.gd kaydeder (sim.gd)
 var my_map_vote := -1                # lobide secilen harita (-1 = rastgele)
 var _buffer: Array = []              # game_ready oncesi gelen [metod, argv] cagrilari
 var _host_scene_ready := false
-var _client_ready := false
-var _client_vote := -1
-var _vote_wait := false
+var _ready_peers := {}               # host: pid -> map_hash dogrulandi
+var _match_launched := false         # host_start cagrildi (lobi kapandi)
 
 
 func _ready() -> void:
@@ -36,7 +38,7 @@ func is_host() -> bool:
 
 func host_game() -> Error:
 	var p := ENetMultiplayerPeer.new()
-	var err := p.create_server(PORT, 1)
+	var err := p.create_server(PORT, D.MAX_PLAYERS - 1)
 	if err != OK:
 		return err
 	multiplayer.multiplayer_peer = p
@@ -52,7 +54,6 @@ func join_game(ip: String) -> Error:
 		return err
 	multiplayer.multiplayer_peer = p
 	net_active = true
-	GameState.my_pid = 2
 	return OK
 
 
@@ -61,12 +62,27 @@ func leave() -> void:
 		multiplayer.multiplayer_peer.close()
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	net_active = false
-	client_peer_id = 0
+	peers.clear()
+	peer_votes.clear()
 	game_ready = false
 	sim = null
 	_buffer.clear()
 	_host_scene_ready = false
-	_client_ready = false
+	_ready_peers.clear()
+	_match_launched = false
+	GameState.my_pid = 1
+
+
+func player_total() -> int:
+	## Lobideki oyuncu sayisi (host dahil).
+	return 1 + peers.size()
+
+
+func _pid_of_peer(peer_id: int) -> int:
+	for pid in peers:
+		if peers[pid] == peer_id:
+			return pid
+	return 0
 
 
 # === baglanti akisi ===
@@ -74,57 +90,97 @@ func leave() -> void:
 func _on_peer_connected(id: int) -> void:
 	if not is_host():
 		return
-	client_peer_id = id
-	# harita OYLAMASI: istemcinin oyunu bekle (gelmezse 2.5 sn sonra basla)
-	_client_vote = -1
-	_vote_wait = true
-	get_tree().create_timer(2.5).timeout.connect(_begin_handshake)
+	if _match_launched:
+		multiplayer.multiplayer_peer.disconnect_peer(id)   # mac basladi: gec kalan giremez
+		return
+	var pid := 0
+	for cand in range(2, D.MAX_PLAYERS + 1):
+		if not peers.has(cand):
+			pid = cand
+			break
+	if pid == 0:
+		multiplayer.multiplayer_peer.disconnect_peer(id)   # lobi dolu
+		return
+	peers[pid] = id
+	_broadcast_lobby()
+
+
+func _on_peer_disconnected(id: int) -> void:
+	if not is_host():
+		return
+	var pid := _pid_of_peer(id)
+	if pid == 0:
+		return
+	if not _match_launched:
+		peers.erase(pid)
+		peer_votes.erase(pid)
+		_ready_peers.erase(pid)
+		_broadcast_lobby()
+		Bus.lobby_status.emit(Tr.t(&"opponent_left"))
+		return
+	# mac sirasinda kacis: oyuncu elenir; tek kisi kalirsa mac biter
+	peers.erase(pid)
+	_ready_peers.erase(pid)
+	if GameState.result.is_empty() and sim != null:
+		sim.eliminate_player(pid, true)
+
+
+func _broadcast_lobby() -> void:
+	Bus.lobby_players.emit(player_total(), D.MAX_PLAYERS)
+	for pid in peers:
+		sv_lobby_state.rpc_id(peers[pid], player_total(), D.MAX_PLAYERS)
+
+
+@rpc("authority", "call_remote", "reliable")
+func sv_lobby_state(count: int, max_p: int) -> void:
+	Bus.lobby_players.emit(count, max_p)
 
 
 @rpc("any_peer", "call_remote", "reliable")
 func cmd_map_vote(t: int) -> void:
-	if not is_host() or multiplayer.get_remote_sender_id() != client_peer_id:
+	if not is_host():
 		return
-	_client_vote = clampi(t, -1, 4)
-	_begin_handshake()
+	var pid := _pid_of_peer(multiplayer.get_remote_sender_id())
+	if pid > 0:
+		peer_votes[pid] = clampi(t, -1, 4)
 
 
-func _begin_handshake() -> void:
-	if not _vote_wait or client_peer_id == 0 or not is_host():
+func host_start() -> void:
+	## Lobiden: haritayi sec, herkese pid+seed dagit, mac sahnesine gec.
+	if not is_host() or _match_launched or peers.is_empty():
 		return
-	_vote_wait = false
-	# oylama cozumu: ayni -> o harita; farkli -> ikisinden rastgele;
-	# oy yoksa tamamen rastgele
-	var choice := _resolve_votes(my_map_vote, _client_vote)
+	_match_launched = true
+	var votes: Array = [my_map_vote]
+	for pid in peer_votes:
+		votes.append(peer_votes[pid])
+	var choice := tally_votes(votes)
 	var base := (randi() % 899999) + 100000
 	var seed_v := MapGen.seed_with_type(base, choice) if choice >= 0 else base
-	GameState.reset(seed_v)
+	var count := player_total()
+	GameState.reset(seed_v, count)
 	GameState.my_pid = 1
-	sv_hello.rpc_id(client_peer_id, 2, GameState.seed_v, D.defs_hash())
+	for pid in peers:
+		sv_hello.rpc_id(peers[pid], pid, GameState.seed_v, D.defs_hash(), count)
 	get_tree().change_scene_to_file("res://scenes/game.tscn")
 
 
-func _resolve_votes(a: int, b: int) -> int:
-	if a >= 0 and b >= 0:
-		if a == b:
-			return a
-		return a if randi() % 2 == 0 else b
-	if a >= 0:
-		return a
-	if b >= 0:
-		return b
-	return -1
-
-
-func _on_peer_disconnected(_id: int) -> void:
-	if not is_host():
-		return
-	client_peer_id = 0
-	_client_ready = false
-	if GameState.match_running and GameState.result.is_empty():
-		_apply_game_over(1, D.Reason.OPPONENT_LEFT)
-	else:
-		Bus.lobby_status.emit(Tr.t(&"opponent_left"))
+static func tally_votes(votes: Array) -> int:
+	## Cogunluk kazanir; esitlikte en cok oy alanlar arasindan rastgele;
+	## hic oy yoksa -1 (tamamen rastgele harita).
+	var counts := {}
+	for v in votes:
+		if v >= 0:
+			counts[v] = counts.get(v, 0) + 1
+	if counts.is_empty():
+		return -1
+	var best := 0
+	for t in counts:
+		best = maxi(best, counts[t])
+	var top: Array = []
+	for t in counts:
+		if counts[t] == best:
+			top.append(t)
+	return top[randi() % top.size()]
 
 
 func _on_connected_ok() -> void:
@@ -147,14 +203,14 @@ func _on_server_disconnected() -> void:
 
 
 @rpc("authority", "call_remote", "reliable")
-func sv_hello(pid: int, p_seed: int, defs_h: int) -> void:
+func sv_hello(pid: int, p_seed: int, defs_h: int, players: int) -> void:
 	# istemcide calisir: surum kontrolu + ayni seed'le haritayi lokal uret
 	if defs_h != D.defs_hash():
 		Bus.net_error.emit(Tr.t(&"version_mismatch"))
 		leave()
 		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 		return
-	GameState.reset(p_seed)
+	GameState.reset(p_seed, players)
 	GameState.my_pid = pid
 	get_tree().change_scene_to_file("res://scenes/game.tscn")
 
@@ -176,8 +232,14 @@ func set_game_ready() -> void:
 func _try_start_match() -> void:
 	if not _host_scene_ready or GameState.match_running or not GameState.result.is_empty():
 		return
-	if net_active and not _client_ready:
-		return
+	if net_active:
+		for pid in peers:
+			if not _ready_peers.get(pid, false):
+				return
+		# el sikisma sirasinda kacan oldueysa koltugu bos birak (elenmis baslar)
+		for pid in GameState.player_ids():
+			if pid != 1 and not peers.has(pid) and _match_launched:
+				GameState.eliminated[pid] = true
 	if sim != null:
 		sim.start_match()
 
@@ -191,23 +253,24 @@ func _buffered(method: StringName, argv: Array) -> bool:
 
 @rpc("any_peer", "call_remote", "reliable")
 func cmd_client_ready(map_hash: int) -> void:
-	if not is_host() or client_peer_id == 0:
+	if not is_host():
 		return
-	if multiplayer.get_remote_sender_id() != client_peer_id:
+	var pid := _pid_of_peer(multiplayer.get_remote_sender_id())
+	if pid == 0:
 		return
-	_client_ready_check(map_hash)
+	_client_ready_check(pid, map_hash)
 
 
-func _client_ready_check(map_hash: int) -> void:
+func _client_ready_check(pid: int, map_hash: int) -> void:
 	# host sahnesi henuz hazir degilse erteleyip ayni kontrolu sonra yap
-	if _buffered(&"_client_ready_check", [map_hash]):
+	if _buffered(&"_client_ready_check", [pid, map_hash]):
 		return
 	if map_hash != GameState.map_hash:
 		push_error("Harita hash uyusmazligi: host=%d istemci=%d" % [GameState.map_hash, map_hash])
-		if multiplayer.multiplayer_peer != null and client_peer_id != 0:
-			multiplayer.multiplayer_peer.disconnect_peer(client_peer_id)
+		if multiplayer.multiplayer_peer != null and peers.has(pid):
+			multiplayer.multiplayer_peer.disconnect_peer(peers[pid])
 		return
-	_client_ready = true
+	_ready_peers[pid] = true
 	_try_start_match()
 
 
@@ -216,9 +279,9 @@ func _client_ready_check(map_hash: int) -> void:
 # === get_remote_sender_id()'ye guvenir.
 
 func _cmd_pid() -> int:
-	if not is_host() or client_peer_id == 0:
+	if not is_host():
 		return 0
-	return 2 if multiplayer.get_remote_sender_id() == client_peer_id else 0
+	return _pid_of_peer(multiplayer.get_remote_sender_id())
 
 
 func send_move(ids: PackedInt32Array, target: Vector2) -> void:
@@ -293,124 +356,137 @@ func send_declare_war() -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func cmd_move(ids: PackedInt32Array, target: Vector2) -> void:
-	if _cmd_pid() == 2 and sim != null:
-		sim.handle_move(2, ids, target)
+	var pid := _cmd_pid()
+	if pid > 0 and sim != null:
+		sim.handle_move(pid, ids, target)
 
 
 @rpc("any_peer", "call_remote", "reliable")
 func cmd_gather(ids: PackedInt32Array, cell: Vector2i) -> void:
-	if _cmd_pid() == 2 and sim != null:
-		sim.handle_gather(2, ids, cell)
+	var pid := _cmd_pid()
+	if pid > 0 and sim != null:
+		sim.handle_gather(pid, ids, cell)
 
 
 @rpc("any_peer", "call_remote", "reliable")
 func cmd_build(def_id: StringName, cell: Vector2i, builder_ids: PackedInt32Array) -> void:
-	if _cmd_pid() == 2 and sim != null:
-		sim.handle_build(2, def_id, cell, builder_ids)
+	var pid := _cmd_pid()
+	if pid > 0 and sim != null:
+		sim.handle_build(pid, def_id, cell, builder_ids)
 
 
 @rpc("any_peer", "call_remote", "reliable")
 func cmd_assign_build(ids: PackedInt32Array, building_id: int) -> void:
-	if _cmd_pid() == 2 and sim != null:
-		sim.handle_assign_build(2, ids, building_id)
+	var pid := _cmd_pid()
+	if pid > 0 and sim != null:
+		sim.handle_assign_build(pid, ids, building_id)
 
 
 @rpc("any_peer", "call_remote", "reliable")
 func cmd_upgrade(building_id: int) -> void:
-	if _cmd_pid() == 2 and sim != null:
-		sim.handle_upgrade(2, building_id)
+	var pid := _cmd_pid()
+	if pid > 0 and sim != null:
+		sim.handle_upgrade(pid, building_id)
 
 
 @rpc("any_peer", "call_remote", "reliable")
 func cmd_demolish(building_id: int) -> void:
-	if _cmd_pid() == 2 and sim != null:
-		sim.handle_demolish(2, building_id)
+	var pid := _cmd_pid()
+	if pid > 0 and sim != null:
+		sim.handle_demolish(pid, building_id)
 
 
 @rpc("any_peer", "call_remote", "reliable")
 func cmd_train(building_id: int, def_id: StringName) -> void:
-	if _cmd_pid() == 2 and sim != null:
-		sim.handle_train(2, building_id, def_id)
+	var pid := _cmd_pid()
+	if pid > 0 and sim != null:
+		sim.handle_train(pid, building_id, def_id)
 
 
 @rpc("any_peer", "call_remote", "reliable")
 func cmd_cancel_train(building_id: int, index: int) -> void:
-	if _cmd_pid() == 2 and sim != null:
-		sim.handle_cancel_train(2, building_id, index)
+	var pid := _cmd_pid()
+	if pid > 0 and sim != null:
+		sim.handle_cancel_train(pid, building_id, index)
 
 
 @rpc("any_peer", "call_remote", "reliable")
 func cmd_attack(ids: PackedInt32Array, target_id: int) -> void:
-	if _cmd_pid() == 2 and sim != null:
-		sim.handle_attack(2, ids, target_id)
+	var pid := _cmd_pid()
+	if pid > 0 and sim != null:
+		sim.handle_attack(pid, ids, target_id)
 
 
 @rpc("any_peer", "call_remote", "reliable")
 func cmd_declare_war() -> void:
-	if _cmd_pid() == 2 and sim != null:
-		sim.handle_declare_war(2)
+	var pid := _cmd_pid()
+	if pid > 0 and sim != null:
+		sim.handle_declare_war(pid)
 
 
 # === host -> istemci yayinlari (sim cagirir) ===
 
 func _client_connected() -> bool:
-	return net_active and client_peer_id != 0
+	return net_active and not peers.is_empty()
 
 
 func bc_spawn(id: int, def_id: StringName, owner_pid: int, pos: Vector2) -> void:
-	if _client_connected():
-		# gorunmez mayin: host'un (P1) mayini istemciye HIC gonderilmez
-		# (istemci P2'nin kendi mayinlari normal gider)
-		if owner_pid == 1 and D.building(def_id).get("mine", false):
-			return
-		sv_spawn.rpc_id(client_peer_id, id, def_id, owner_pid, pos)
+	if not _client_connected():
+		return
+	var is_mine: bool = D.building(def_id).get("mine", false)
+	for pid in peers:
+		# gorunmez mayin: SADECE sahibine gonderilir (digerleri varligini bilmez)
+		if is_mine and owner_pid != pid:
+			continue
+		sv_spawn.rpc_id(peers[pid], id, def_id, owner_pid, pos)
 
 
 func bc_despawn(id: int, reason: int) -> void:
-	if _client_connected():
-		sv_despawn.rpc_id(client_peer_id, id, reason)
+	for pid in peers:
+		sv_despawn.rpc_id(peers[pid], id, reason)
 
 
 func ev(kind: int, args: Array = []) -> void:
-	## host'ta lokal uygula + istemciye ilet
+	## host'ta lokal uygula + tum istemcilere ilet
 	_apply_event(kind, args)
-	if _client_connected():
-		sv_event.rpc_id(client_peer_id, kind, args)
+	for pid in peers:
+		sv_event.rpc_id(peers[pid], kind, args)
 
 
 func toast_to(pid: int, key: StringName) -> void:
 	## tek oyuncuya ozel toast (orn. "savas ilan ettin" / "rakip ilan etti")
 	if pid == 1:
 		Bus.toast.emit(Tr.t(key))
-	elif _client_connected():
-		sv_event.rpc_id(client_peer_id, D.Ev.TOAST_KEY, [key])
+	elif peers.has(pid):
+		sv_event.rpc_id(peers[pid], D.Ev.TOAST_KEY, [key])
 
 
 func reject_to(pid: int, reason: int) -> void:
 	if pid == 1:
 		Bus.build_rejected.emit(reason)
-	elif _client_connected():
-		sv_event.rpc_id(client_peer_id, D.Ev.BUILD_REJECTED, [reason])
+	elif peers.has(pid):
+		sv_event.rpc_id(peers[pid], D.Ev.BUILD_REJECTED, [reason])
 
 
 func bc_resources(pid: int) -> void:
 	if not _client_connected():
 		return
 	var r: Dictionary = GameState.res[pid]
-	sv_resources.rpc_id(client_peer_id, pid,
-		int(r["wood"]), int(r["stone"]), int(r["food"]), int(r["money"]),
-		GameState.pop_used[pid], GameState.pop_cap[pid])
+	for to_pid in peers:
+		sv_resources.rpc_id(peers[to_pid], pid,
+			int(r["wood"]), int(r["stone"]), int(r["food"]), int(r["money"]),
+			GameState.pop_used[pid], GameState.pop_cap[pid])
 
 
 func game_over(winner: int, reason: int) -> void:
-	if _client_connected():
-		sv_game_over.rpc_id(client_peer_id, winner, reason)
+	for pid in peers:
+		sv_game_over.rpc_id(peers[pid], winner, reason)
 	_apply_game_over(winner, reason)
 
 
 func bc_snapshot(blob: PackedByteArray) -> void:
-	if _client_connected():
-		sv_snapshot.rpc_id(client_peer_id, blob)
+	for pid in peers:
+		sv_snapshot.rpc_id(peers[pid], blob)
 
 
 # === istemci tarafi alicilar ===
@@ -506,6 +582,15 @@ func _apply_event(kind: int, args: Array) -> void:
 			var scene := get_tree().current_scene
 			if scene != null and scene.has_method("spawn_fx"):
 				scene.spawn_fx(&"dirt", args[0])
+		D.Ev.ELIMINATED:
+			var who: int = args[0]
+			GameState.eliminated[who] = true
+			Bus.player_eliminated.emit(who)
+			if who == GameState.my_pid:
+				Bus.toast.emit(Tr.t(&"eliminated_you"))
+			else:
+				Bus.toast.emit(Tr.t(&"eliminated_player") % who)
+			print("ELIMINATED pid=", who, " me=", GameState.my_pid)   # smoke
 
 
 func _apply_game_over(winner: int, reason: int) -> void:

@@ -53,10 +53,8 @@ func setup(p_id: int, p_def_id: StringName, p_owner: int) -> void:
 	sprite.hframes = _anim_frames
 	sprite.vframes = 1
 	add_child(sprite)
-	if def.has("bridge"):
-		z_index = -1   # kopru ZEMINDIR: birimler ustunde yurur, altinda degil
-	elif def.has("mine"):
-		z_index = -1   # mayin da yerde; birimler uzerinden gecer
+	# kopru/mayin zemin dekorudur: game.gd onlari y-sort'suz GroundDecals
+	# katmanina koyar (birimler her zaman ustunde gorunur)
 	_anim_t = randf() * _anim_frames * _anim_dt   # binalar senkron oynamasin
 	_update_construction_visual()
 

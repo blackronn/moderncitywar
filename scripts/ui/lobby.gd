@@ -9,6 +9,8 @@ const UiKit := preload("res://scripts/ui/ui_kit.gd")
 
 var status: Label
 var ip_edit: LineEdit
+var players_label: Label
+var start_btn: Button
 var _vote_buttons := {}
 
 
@@ -71,6 +73,13 @@ func _ready() -> void:
 		_vote_buttons[o[0]] = vb
 		vote_row.add_child(vb)
 
+	# oyuncu sayaci (2-4 kisi; host dahil)
+	players_label = Label.new()
+	UiKit.label(players_label, 9, UiKit.ACCENT)
+	players_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	players_label.text = Tr.t(&"players_in_lobby") % [1, 4]
+	box.add_child(players_label)
+
 	if mode == "host":
 		status.text = Tr.t(&"waiting_opponent")
 		var st_tw := create_tween().set_loops()
@@ -84,6 +93,14 @@ func _ready() -> void:
 		UiKit.label(hint, 7, UiKit.TEXT_DIM)
 		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		hint_pod.add_child(hint)
+		# 2-4 oyuncu: host istedigi an baslatir (en az 1 rakip baglanmis olmali)
+		start_btn = Button.new()
+		start_btn.text = Tr.t(&"start_match")
+		UiKit.button(start_btn, 14, UiKit.ACCENT_BLUE)
+		start_btn.custom_minimum_size = Vector2(300, 44)
+		start_btn.disabled = true
+		start_btn.pressed.connect(func(): Net.host_start())
+		box.add_child(start_btn)
 	else:
 		var ip_pod := PanelContainer.new()
 		UiKit.pod(ip_pod, 4)
@@ -117,6 +134,18 @@ func _ready() -> void:
 
 	Bus.lobby_status.connect(_set_status)
 	Bus.net_error.connect(_set_status)
+	Bus.lobby_players.connect(_on_players)
+	if mode == "host":
+		_on_players(Net.player_total(), 4)
+
+
+func _on_players(count: int, max_p: int) -> void:
+	players_label.text = Tr.t(&"players_in_lobby") % [count, max_p]
+	if start_btn != null:
+		start_btn.disabled = count < 2
+		start_btn.tooltip_text = Tr.t(&"need_two_players") if count < 2 else ""
+	if mode != "host":
+		status.text = Tr.t(&"waiting_host_start")
 
 
 func _local_ips() -> String:

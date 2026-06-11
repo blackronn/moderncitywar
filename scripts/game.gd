@@ -17,6 +17,7 @@ const BuildingScript := preload("res://scripts/entities/building.gd")
 
 var terrain: TileMapLayer
 var features: TileMapLayer
+var ground: Node2D
 var entities: Node2D
 var fx: Node2D
 var cam: Camera2D
@@ -34,7 +35,7 @@ func _ready() -> void:
 		GameState.reset(D.DEFAULT_SEED)
 
 	# iki uc da ayni seed'den ayni haritayi uretir (hash ile dogrulanir)
-	var gen := MapGen.generate(GameState.seed_v)
+	var gen := MapGen.generate(GameState.seed_v, GameState.player_count)
 	GameState.grid = gen["grid"]
 	GameState.spawns = gen["spawns"]
 	GameState.map_type = gen["map_type"]
@@ -54,6 +55,12 @@ func _ready() -> void:
 	var border: Node2D = preload("res://scripts/border_line.gd").new()
 	border.name = "BorderLine"
 	add_child(border)
+
+	# zemin dekorlari (kopru/mayin): araziden SONRA, birimlerden ONCE cizilir;
+	# y-sort'a girmez — birimler her zaman ustunden yurur
+	ground = Node2D.new()
+	ground.name = "GroundDecals"
+	add_child(ground)
 
 	entities = Node2D.new()
 	entities.name = "Entities"
@@ -153,10 +160,13 @@ func spawn_entity_visual(id: int, def_id: StringName, owner_pid: int, pos: Vecto
 		# kopru/mayin/siper yuruyusu ENGELLEMEZ (gecis, gizli, arkasinda durma)
 		if not node.def.has("bridge") and not node.def.has("mine") and not node.def.has("cover"):
 			pathing.set_rect_solid(node.cell, size, true)
-		# rakibin mayini bu ekranda gorunmez (host iki tarafi da sim'ler)
+		# rakibin mayini bu ekranda gorunmez (host herkesi sim'ler)
 		if node.def.has("mine") and owner_pid != GameState.my_pid:
 			node.visible = false
-	entities.add_child(node)
+	if node is BuildingScript and (node.def.has("bridge") or node.def.has("mine")):
+		ground.add_child(node)   # zemin dekoru: birimlerin ALTINDA kalir
+	else:
+		entities.add_child(node)
 	GameState.entities[id] = node
 	Bus.entity_spawned.emit(node)
 	return node

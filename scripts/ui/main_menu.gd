@@ -140,6 +140,8 @@ func _handle_cli() -> void:
 	var preview := false
 	var demo := false
 	var menu_shot := ""
+	var seed_override := 0
+	var players_override := 2
 	for arg in OS.get_cmdline_user_args():
 		if arg == "--smoke-host":
 			smoke_host = true
@@ -152,6 +154,10 @@ func _handle_cli() -> void:
 			demo = true
 		elif arg.begins_with("--screenshot="):
 			menu_shot = arg.get_slice("=", 1)
+		elif arg.begins_with("--seed="):
+			seed_override = int(arg.get_slice("=", 1))
+		elif arg.begins_with("--players="):
+			players_override = clampi(int(arg.get_slice("=", 1)), 2, D.MAX_PLAYERS)
 	if smoke_host:
 		var bot: Node = load("res://tools/smoke/host_bot.gd").new()
 		get_tree().root.add_child.call_deferred(bot)
@@ -167,7 +173,7 @@ func _handle_cli() -> void:
 			printerr("SMOKE_FAIL join_game err=", err)
 			get_tree().quit(1)
 	elif preview:
-		GameState.reset(D.DEFAULT_SEED)
+		GameState.reset(seed_override if seed_override > 0 else D.DEFAULT_SEED, players_override)
 		GameState.my_pid = 1
 		if demo:
 			var dbot: Node = load("res://tools/smoke/demo_bot.gd").new()

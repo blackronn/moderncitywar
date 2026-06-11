@@ -8,57 +8,54 @@ const D := preload("res://scripts/autoload/defs.gd")
 const MapGen := preload("res://scripts/sim/map_gen.gd")
 
 var astar := AStarGrid2D.new()
-var astar_half := {}    # pid -> AStarGrid2D (1: x < W/2 serbest, 2: x >= W/2 serbest)
+var astar_half := {}    # pid -> AStarGrid2D (baris bolgesi disi kapali)
+var players := 2
 
 
-func setup(grid: PackedInt32Array) -> void:
+func setup(grid: PackedInt32Array, p_players := 2) -> void:
+	players = p_players
 	_setup_one(astar, grid, 0)
-	for pid in [1, 2]:
+	for pid in range(1, players + 1):
 		var a := AStarGrid2D.new()
 		_setup_one(a, grid, pid)
 		astar_half[pid] = a
 
 
 func _setup_one(a: AStarGrid2D, grid: PackedInt32Array, half_pid: int) -> void:
-	## half_pid 1/2: kendi yari + TARAFSIZ orta bant serbest, rakip yari kapali.
+	## half_pid > 0: oyuncunun baris bolgesi (yari/ceyrek + tarafsiz bant)
+	## disindaki her sey kapali (D.in_zone).
 	a.region = Rect2i(0, 0, D.MAP_W, D.MAP_H)
 	a.cell_size = Vector2(1, 1)
 	a.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
 	a.update()
-	var mid := D.MAP_W / 2
 	for y in D.MAP_H:
 		for x in D.MAP_W:
+			var c := Vector2i(x, y)
 			var solid := not MapGen.walkable(grid[y * D.MAP_W + x])
-			if half_pid == 1 and x >= mid + D.NEUTRAL_HALF_W:
+			if half_pid > 0 and not D.in_zone(half_pid, c, players):
 				solid = true
-			elif half_pid == 2 and x < mid - D.NEUTRAL_HALF_W:
-				solid = true
-			a.set_point_solid(Vector2i(x, y), solid)
+			a.set_point_solid(c, solid)
 
 
 func set_rect_solid(top_left: Vector2i, size: Vector2i, solid: bool) -> void:
-	var mid := D.MAP_W / 2
 	for dy in size.y:
 		for dx in size.x:
 			var c := top_left + Vector2i(dx, dy)
 			if in_bounds(c):
 				astar.set_point_solid(c, solid)
-				if c.x < mid + D.NEUTRAL_HALF_W:
-					astar_half[1].set_point_solid(c, solid)
-				if c.x >= mid - D.NEUTRAL_HALF_W:
-					astar_half[2].set_point_solid(c, solid)
+				for pid in astar_half:
+					if D.in_zone(pid, c, players):
+						astar_half[pid].set_point_solid(c, solid)
 
 
 func set_cell_walk(c: Vector2i, walk: bool) -> void:
 	## Kopru kuruldu/yikildi: su hucresi yurunebilir olur (bolge sinirlarini korur).
 	if not in_bounds(c):
 		return
-	var mid := D.MAP_W / 2
 	astar.set_point_solid(c, not walk)
-	if c.x < mid + D.NEUTRAL_HALF_W:
-		astar_half[1].set_point_solid(c, not walk)
-	if c.x >= mid - D.NEUTRAL_HALF_W:
-		astar_half[2].set_point_solid(c, not walk)
+	for pid in astar_half:
+		if D.in_zone(pid, c, players):
+			astar_half[pid].set_point_solid(c, not walk)
 
 
 func in_bounds(c: Vector2i) -> bool:
