@@ -11,8 +11,10 @@ func run() -> Array:
 		errs.append("defs_hash kararsiz")
 	if D.UNITS.size() != 9:
 		errs.append("9 birim bekleniyordu, %d var" % D.UNITS.size())
-	if D.BUILDINGS.size() != 11:
-		errs.append("11 bina bekleniyordu, %d var" % D.BUILDINGS.size())
+	if D.BUILDINGS.size() != 12:
+		errs.append("12 bina bekleniyordu, %d var" % D.BUILDINGS.size())
+	if D.COVER_MISS < 0.5 or D.COVER_MISS > 0.8:
+		errs.append("COVER_MISS makul aralikta degil")
 	if D.metro_types() != 9:
 		errs.append("metro_types 9 olmali (kopru+mayin haric), %d" % D.metro_types())
 	# iska oranlari mantikli araliklarda

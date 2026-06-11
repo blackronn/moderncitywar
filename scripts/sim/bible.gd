@@ -68,6 +68,7 @@ const BUILDING_ANIMS := {
 	&"turret": [24, 0.2],         # tarama + ates dongusu (4.8 sn)
 	&"bridge_seg": [8, 0.4909],   # altindaki su akar
 	&"mine": [8, 0.25],           # kurulum isigi yanip soner (sadece sahibi gorur)
+	&"sandbags": [6, 0.4],        # hafif bayrak/toz kipirtisi
 }
 
 # --- zeminler ---
@@ -81,6 +82,7 @@ const TILE_ANIMS := {
 	&"gold": [3, 6, 0.4363],     # seffaf zemin: tarafsiz bolge altini
 	&"snow": [3, 6, 0.5236],
 	&"hill": [3, 4, 0.6],
+	&"mountain": [3, 4, 0.7],    # gecilmez buyuk dag
 }
 
 # --- efektler ---

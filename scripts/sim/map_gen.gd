@@ -113,20 +113,64 @@ static func generate(seed_v: int) -> Dictionary:
 		var start := Vector2i(rng.randi_range(1, cl - 2), rng.randi_range(1, h - 2))
 		_walk_blob(rng, grid, cl, start, D.Tile.STONE, rng.randi_range(3, 6), center1)
 
-	# --- tarafsiz bolge altin rezervleri (orta bant; iki taraf da kazabilir) ---
+	# --- tarafsiz bolge altin rezervleri: ULASMAK CABA ISTER ---
+	# nehir/gol: suyla cevrili adaciklar (sadece KOPRUYLE gidilir);
+	# ova/kar: gecitli DAG cemberi icinde altin cebi (gecitler = mayin/siper noktasi);
+	# vadi: kayalik gecitlerin actigi orta koridorda.
 	var mid := w / 2
-	var placed := 0
-	var gtries := 0
-	while placed < 3 and gtries < 80:
-		gtries += 1
-		var gx := rng.randi_range(mid - D.NEUTRAL_HALF_W, mid - 2)
-		var gy := rng.randi_range(4, h - 5)
-		var gi := gy * w + gx
-		if grid[gi] == D.Tile.GRASS or grid[gi] == D.Tile.SNOW:
-			grid[gi] = D.Tile.GOLD
-			if grid[gi + w] == D.Tile.GRASS or grid[gi + w] == D.Tile.SNOW:
-				grid[gi + w] = D.Tile.GOLD   # 2'li damar
-			placed += 1
+	match map_type:
+		D.MapType.RIVER:
+			# nehrin icinde 2 adacik: cevresi su, ustunde altin.
+			# kopru satirlarina carpmasin (koprunun ustune ada acilmasin)
+			for base_iy: int in [h / 2 - 9, h / 2 + 7]:
+				var iy := base_iy
+				var guard := 0
+				while guard < 10 and _near_bridge(iy, bridge_rows):
+					iy += 3
+					guard += 1
+				for y in range(iy - 1, iy + 3):
+					grid[y * w + 21] = D.Tile.WATER
+					grid[y * w + 22] = D.Tile.WATER
+					grid[y * w + 23] = D.Tile.WATER
+				grid[iy * w + 23] = D.Tile.GOLD
+				grid[(iy + 1) * w + 23] = D.Tile.GOLD
+		D.MapType.LAKE:
+			# gol ortasinda altin adasi (koprusuz ulasilmaz)
+			var cy := h / 2
+			for y in range(cy - 2, cy + 2):
+				grid[y * w + 22] = D.Tile.GRASS
+				grid[y * w + 23] = D.Tile.GRASS
+			grid[(cy - 1) * w + 23] = D.Tile.GOLD
+			grid[cy * w + 23] = D.Tile.GOLD
+			grid[(cy - 1) * w + 22] = D.Tile.GOLD
+		D.MapType.SNOW, D.MapType.PLAINS:
+			# gecitli dag cemberi icinde altin cebi
+			var cy2 := h / 2
+			var ground := D.Tile.SNOW if map_type == D.MapType.SNOW else D.Tile.GRASS
+			for y in range(cy2 - 7, cy2 + 8):
+				for x in range(mid - 7, mid):
+					var dx := float(x) - (float(mid) - 0.5)
+					var dy := float(y) - float(cy2)
+					var dist := sqrt(dx * dx + dy * dy)
+					if dist >= 4.6 and dist <= 6.4:
+						# gecitler: ust ve alt giris KOLONLARI tamamen acik
+						# (bant 2 hucre kalin; tek satir acmak yetmiyordu)
+						if absi(x - (mid - 1)) <= 1:
+							continue
+						grid[y * w + x] = D.Tile.MOUNTAIN
+					elif dist < 4.0 and grid[y * w + x] == ground:
+						grid[y * w + x] = ground
+			grid[(cy2 - 1) * w + (mid - 2)] = D.Tile.GOLD
+			grid[cy2 * w + (mid - 2)] = D.Tile.GOLD
+			grid[(cy2 + 1) * w + (mid - 3)] = D.Tile.GOLD
+		D.MapType.VALLEY:
+			# orta koridorda altin (kayalik gecitler zaten caba istiyor)
+			var cy3 := h / 2
+			for off: Vector2i in [Vector2i(mid - 2, cy3 - 6), Vector2i(mid - 3, cy3), Vector2i(mid - 2, cy3 + 6)]:
+				if grid[off.y * w + off.x] == D.Tile.GRASS:
+					grid[off.y * w + off.x] = D.Tile.GOLD
+				if grid[(off.y + 1) * w + off.x] == D.Tile.GRASS:
+					grid[(off.y + 1) * w + off.x] = D.Tile.GOLD
 
 	# --- aynala: sol yari [0..cl] -> sag yari ---
 	for y in h:
@@ -177,6 +221,13 @@ static func _walk_blob_kind(rng: RandomNumberGenerator, grid: PackedInt32Array, 
 		cur.y = clampi(cur.y, 1, h - 2)
 
 
+static func _near_bridge(y: int, bridge_rows: Array[int]) -> bool:
+	for br in bridge_rows:
+		if absi(y - br) <= 2 or absi((y + 1) - br) <= 2:
+			return true
+	return false
+
+
 static func walkable(tile: int) -> bool:
-	## Su ve engebe (HILL... HILL yurunur ama yavas; sadece su gecilmez).
-	return tile != D.Tile.WATER and tile != -1
+	## Su ve DAG gecilmez; HILL yurunur ama yavas (TILE_SPEED).
+	return tile != D.Tile.WATER and tile != D.Tile.MOUNTAIN and tile != -1

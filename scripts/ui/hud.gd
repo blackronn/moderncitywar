@@ -11,7 +11,7 @@ const FONT := preload("res://assets/fonts/PublicPixel.ttf")
 
 const BUILDABLE: Array[StringName] = [
 	&"house", &"greenhouse", &"bank", &"lumber_camp", &"quarry",
-	&"barracks", &"factory", &"turret", &"bridge_seg", &"mine",
+	&"barracks", &"factory", &"turret", &"bridge_seg", &"mine", &"sandbags",
 ]
 const ARMY_TYPES: Array[StringName] = [
 	&"worker", &"rifleman", &"sniper", &"rpg", &"mg", &"commando",
@@ -22,6 +22,7 @@ const MINI_COLORS := {
 	D.Tile.BRIDGE: Color("#b07a43"), D.Tile.FOREST: Color("#2f8a3e"),
 	D.Tile.STONE: Color("#9aa0a9"), D.Tile.GOLD: Color("#f3c64a"),
 	D.Tile.SNOW: Color("#e6edf3"), D.Tile.HILL: Color("#8d8273"),
+	D.Tile.MOUNTAIN: Color("#4f4a55"),
 }
 
 var game: Node2D = null
@@ -459,7 +460,7 @@ func _on_res(pid: int) -> void:
 	var have := {}
 	for e in GameState.entities.values():
 		if e.owner_pid == GameState.my_pid and e.def.has("size") and e.is_complete() \
-				and not e.def.has("bridge") and not e.def.has("mine"):
+				and not e.def.has("bridge") and not e.def.has("mine") and not e.def.has("cover"):
 			have[e.def_id] = true
 	metro_pop_label.text = "%d/%d" % [used, D.METROPOLIS_POP]
 	UiKit.set_bar(metro_bar, float(used) / float(D.METROPOLIS_POP))

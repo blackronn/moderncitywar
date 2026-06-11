@@ -4,7 +4,7 @@ extends Node
 ## preload edip dogrudan kullanir. Sim dosyalari da autoload yerine
 ## `const D := preload(...)` ile erisir.
 
-const VERSION := "0.4.0"
+const VERSION := "0.5.0"
 
 # --- zaman / ag ---
 const TICK_RATE := 30
@@ -33,7 +33,7 @@ const GATHER_RETARGET_T := 6         # kaynak tukenince bu yaricapta yenisi aran
 const MAX_BUILDERS := 3              # ayni insaata en fazla isci
 const TRAIN_QUEUE_MAX := 5
 
-enum Tile { GRASS, WATER, BRIDGE, FOREST, STONE, GOLD, SNOW, HILL }
+enum Tile { GRASS, WATER, BRIDGE, FOREST, STONE, GOLD, SNOW, HILL, MOUNTAIN }
 enum Klass { INFANTRY, ARMOR, BUILDING }
 enum War { PEACE, COUNTDOWN, WAR }
 enum MapType { RIVER, LAKE, PLAINS, SNOW, VALLEY }
@@ -64,6 +64,7 @@ const TILE_SPEED := {
 }
 const BUILDABLE_TILES := [Tile.GRASS, Tile.SNOW]
 const MISS_SPREAD_T := 1.3           # iska eden merminin sapma yaricapi (tile)
+const COVER_MISS := 0.67             # siperdeki birime direkt atislarin iskalanma orani (3'te 1 isabet)
 
 # --- birimler ---
 # speed_t: tile/sn, range_t/aggro_t: tile, cooldown_s: atislar arasi sn, train_s: uretim sn
@@ -174,15 +175,22 @@ const BUILDINGS := {
 		"cost": {"money": 40, "stone": 20}, "hp": 80, "size": Vector2i(1, 1), "build_s": 4.0,
 		"mine": true, "m_dmg": 120, "m_trigger_t": 0.8, "m_splash_t": 1.5,
 	},
+	&"sandbags": {
+		# kum torbasi siperi: yaninda duran dost birimlere direkt atislarin
+		# COVER_MISS kadari iskalanir (3'te 1 isabet); havan/alan hasari DELER.
+		# Yurunebilir (uzerinde/arkasinda durulur), tarafsiz bolgeye kurulabilir.
+		"cost": {"wood": 25, "stone": 15}, "hp": 200, "size": Vector2i(1, 1), "build_s": 6.0,
+		"cover": true, "cover_t": 0.9,
+	},
 }
 
 
 static func metro_types() -> int:
-	## Metropol hedefi icin gereken bina turu sayisi (kopru/mayin haric).
+	## Metropol hedefi icin gereken bina turu sayisi (kopru/mayin/siper haric).
 	var n := 0
 	for id: StringName in BUILDINGS:
 		var b: Dictionary = BUILDINGS[id]
-		if not b.has("bridge") and not b.has("mine"):
+		if not b.has("bridge") and not b.has("mine") and not b.has("cover"):
 			n += 1
 	return n
 

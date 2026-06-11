@@ -35,6 +35,9 @@ func start_match() -> void:
 				node_res[Vector2i(x, y)] = D.FOREST_WOOD
 			elif t == D.Tile.STONE:
 				node_res[Vector2i(x, y)] = D.STONE_AMOUNT
+			elif t == D.Tile.GOLD:
+				# tarafsiz bolge altini: stok olmadan dogup aninda "tukeniyordu"
+				node_res[Vector2i(x, y)] = D.GOLD_AMOUNT
 	for pid in [1, 2]:
 		var tl: Vector2i = GameState.spawns[pid - 1]
 		spawn_building(&"city_hall", pid, tl, true)
@@ -164,9 +167,9 @@ func handle_build(pid: int, def_id: StringName, top_left: Vector2i, builders: Pa
 	var bdef := D.building(def_id)
 	var afford: bool = GameState.can_afford(pid, bdef["cost"])
 	var mid := D.MAP_W / 2
-	# bolge sinirlari: normal binalar baristayken KENDI yarisinda; mayin ve
-	# kopru tarafsiz banda da kurulabilir (altin yolu / nehir gecisi)
-	var reach_neutral: bool = bdef.has("mine") or bdef.has("bridge")
+	# bolge sinirlari: normal binalar baristayken KENDI yarisinda; mayin, kopru
+	# ve siper tarafsiz banda da kurulabilir (altin yolu / nehir gecisi / cephe)
+	var reach_neutral: bool = bdef.has("mine") or bdef.has("bridge") or bdef.has("cover")
 	var bmin := -1
 	var bmax := 9999
 	if _at_peace():
@@ -177,7 +180,7 @@ func handle_build(pid: int, def_id: StringName, top_left: Vector2i, builders: Pa
 	var verdict: int
 	if bdef.has("bridge"):
 		verdict = _validate_bridge(top_left, afford, bmin, bmax)
-	elif bdef.has("mine"):
+	elif bdef.has("mine") or bdef.has("cover"):
 		verdict = _validate_mine(top_left, afford, bmin, bmax)
 	else:
 		verdict = validate_placement(
@@ -230,7 +233,8 @@ func _bridge_entity_at(cell: Vector2i) -> Node:
 
 
 func _validate_mine(cell: Vector2i, afford: bool, bmin: int, bmax: int) -> int:
-	## Mayin: zemine, bina ustune degil; sehir yaricapi kurali YOK (ileri hatta kurulur).
+	## Mayin/siper: zemine, bina ustune degil; sehir yaricapi kurali YOK
+	## (ileri hatta kurulur). Ayni hucrede ikinci mayin/siper olamaz.
 	var t := GameState.grid_at(cell)
 	if not D.BUILDABLE_TILES.has(t):
 		return D.Reject.BAD_SPOT
@@ -239,11 +243,20 @@ func _validate_mine(cell: Vector2i, afford: bool, bmin: int, bmax: int) -> int:
 	if pathing.is_solid(cell):
 		return D.Reject.BLOCKED
 	for b in _buildings():
-		if b.def.has("mine") and b.cell == cell:
+		if (b.def.has("mine") or b.def.has("cover")) and b.cell == cell:
 			return D.Reject.BLOCKED
 	if not afford:
 		return D.Reject.NO_RES
 	return -1
+
+
+func _in_cover(u: Node) -> bool:
+	## Birim, SAGLAM dost kum torbasinin yaninda mi (cover_t yaricapi)?
+	for b in _buildings(u.owner_pid):
+		if b.def.has("cover") and b.is_complete():
+			if u.position.distance_to(b.position) / float(D.TILE) <= float(b.def["cover_t"]):
+				return true
+	return false
 
 
 func handle_demolish(pid: int, building_id: int) -> void:
@@ -674,8 +687,13 @@ func _fire(att: Node, tgt: Node) -> void:
 		_apply_area(att, tgt.owner_pid, impact, splash, 1.0)
 		return
 
-	# --- iska: mermi sapar, nereye gittigi gorunur (toz pufu) ---
+	# --- SIPER: hedef saglam dost kum torbasinin yanindaysa direkt atislarin
+	# --- cogu iskalanir (3'te 1 isabet). Havan ve alan hasari siperi DELER.
 	var miss_c: float = att.def.get("miss", 0.0)
+	if not tgt.def.has("size") and _in_cover(tgt):
+		miss_c = maxf(miss_c, D.COVER_MISS)
+
+	# --- iska: mermi sapar, nereye gittigi gorunur (toz pufu) ---
 	if miss_c > 0.0 and not tgt.def.has("size") and rng.randf() < miss_c:
 		var ma := rng.randf() * TAU
 		var mp: Vector2 = tgt.position + Vector2(cos(ma), sin(ma)) \
@@ -819,7 +837,8 @@ func _check_victory() -> void:
 			continue
 		var have := {}
 		for b in _buildings(pid):
-			if b.is_complete() and not b.def.has("bridge") and not b.def.has("mine"):
+			if b.is_complete() and not b.def.has("bridge") and not b.def.has("mine") \
+					and not b.def.has("cover"):
 				have[b.def_id] = true
 		if have.size() >= D.metro_types():
 			Net.game_over(pid, D.Reason.METROPOLIS)

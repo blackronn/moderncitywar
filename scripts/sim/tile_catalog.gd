@@ -16,6 +16,7 @@ const SRC_IDS := {
 	D.Tile.GOLD: 5,
 	D.Tile.SNOW: 6,
 	D.Tile.HILL: 7,
+	D.Tile.MOUNTAIN: 8,
 }
 const KIND_NAMES := {
 	D.Tile.GRASS: &"grass",
@@ -26,6 +27,7 @@ const KIND_NAMES := {
 	D.Tile.GOLD: &"gold",
 	D.Tile.SNOW: &"snow",
 	D.Tile.HILL: &"hill",
+	D.Tile.MOUNTAIN: &"mountain",
 }
 
 
@@ -69,6 +71,8 @@ static func paint(terrain: TileMapLayer, features: TileMapLayer, grid: PackedInt
 					terrain.set_cell(cell, SRC_IDS[D.Tile.BRIDGE], Vector2i(0, _variant(cell, &"bridge")))
 				D.Tile.HILL:
 					terrain.set_cell(cell, SRC_IDS[D.Tile.HILL], Vector2i(0, _variant(cell, &"hill")))
+				D.Tile.MOUNTAIN:
+					terrain.set_cell(cell, SRC_IDS[D.Tile.MOUNTAIN], Vector2i(0, _variant(cell, &"mountain")))
 				D.Tile.SNOW:
 					terrain.set_cell(cell, SRC_IDS[D.Tile.SNOW], Vector2i(0, _variant(cell, &"snow")))
 				_:

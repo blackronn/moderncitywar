@@ -534,6 +534,9 @@ func bake_building_frame(id: StringName, t: float, pid: int) -> Image:
 	if id == &"mine":
 		_b_mine(t, T)
 		return frame
+	if id == &"sandbags":
+		_b_sandbags(t, T)
+		return frame
 	_S = 1.0 if fpx == 26 else 2.0
 	disc(11, 19.5, 8.5, rgba(0, 0, 0, 0.14))
 	match id:
@@ -799,6 +802,27 @@ func _b_mine(t: float, T: Dictionary) -> void:
 		p(12.7, 13.2, 0.9, 0.9, col("#ff5a4a"))
 
 
+func _b_sandbags(t: float, T: Dictionary) -> void:
+	## Kum torbasi siperi (26px, alcak): iki sira torba + takim flamasi ucu.
+	disc(13, 18.0, 5.6, rgba(0, 0, 0, 0.14))
+	# alt sira (5 torba)
+	for i in 5:
+		var x := 6.0 + i * 3.0
+		disc(x, 16.6, 1.45, col("#b6a06a"))
+		disc(x - 0.3, 16.2, 1.0, col("#cdb67e"))
+		p(x - 1.2, 17.2, 2.4, 0.5, col("#8f7c4e"))
+	# ust sira (4 torba, saskin dizilim)
+	for i in 4:
+		var x := 7.5 + i * 3.0
+		disc(x, 14.4, 1.4, col("#c2ab72"))
+		disc(x - 0.3, 14.0, 0.95, col("#d8c28a"))
+		p(x - 1.1, 15.0, 2.2, 0.5, col("#94814f"))
+	# kucuk takim isareti (kazikta minik flama)
+	p(5.2, 11.6, 0.5, 3.4, col("#6b7280"))
+	var fy := 11.6 + sin(t * 5.0) * 0.3
+	p(5.7, fy, 1.8, 1.2, col(T["main"]))
+
+
 func _b_turret(t: float, T: Dictionary) -> void:
 	p(6.2, 13.0, 9.6, 5.0, col("#b9bec7"))
 	p(6.2, 13.0, 9.6, 0.8, col("#d3d8df"))
@@ -865,6 +889,19 @@ func bake_tile_frame(kind: StringName, t: float, seed_v: int) -> Image:
 			disc(10.6, 9.8, 2.1, col("#857a6a"))
 			p(3.0, 12.0, 2.0, 0.8, col("#5e564a"))
 			p(12.0, 4.0, 1.6, 0.7, col("#5e564a"))
+		&"mountain":
+			# GECILMEZ buyuk dag: koyu kaya govde + karli zirve
+			_t_ground(seed_v, col("#4f4a55"), col("#443f4a"), col("#5b5566"))
+			disc(8, 10, 6.2, col("#5b5566"))
+			disc(8, 9, 5.2, col("#6a6376"))
+			disc(7, 7.4, 3.4, col("#7a7387"))
+			disc(7, 5.8, 2.0, col("#e8ecf2"))   # kar zirve
+			disc(9.5, 6.8, 1.2, col("#d8dee8"))
+			p(3.4, 11.5, 2.2, 0.8, col("#3a3642"))
+			p(10.5, 12.0, 2.4, 0.8, col("#3a3642"))
+			var mg := (sin(t * 1.4 + seed_v) + 1.0) / 2.0
+			if mg > 0.75:
+				p(6.4, 5.6, 0.9, 0.9, rgba(255, 255, 255, mg))
 		# --- ozellik katmani: SEFFAF zemin (cim VEYA kar ustune bindirilir) ---
 		&"forest":
 			_t_tree(t, seed_v)

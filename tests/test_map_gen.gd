@@ -51,12 +51,33 @@ func run() -> Array:
 		# tarafsiz bolgede altin rezervi olmali (tum tipler)
 		var gold_n := 0
 		var mid := D.MAP_W / 2
+		var first_gold := Vector2i(-1, -1)
 		for y in D.MAP_H:
 			for x in range(mid - D.NEUTRAL_HALF_W, mid + D.NEUTRAL_HALF_W):
 				if grid[y * D.MAP_W + x] == D.Tile.GOLD:
 					gold_n += 1
+					if first_gold == Vector2i(-1, -1):
+						first_gold = Vector2i(x, y)
 		if gold_n < 2:
 			errs.append("seed %d: tarafsiz bolgede altin yok (%d)" % [seed_v, gold_n])
+
+		# CABA kurali: nehir/golde altin adada -> koprusuz ULASILMAZ;
+		# ova/karda dag cemberi var (gecitlerden gidilir)
+		if first_gold != Vector2i(-1, -1):
+			var pg := Pathing.new()
+			pg.setup(grid)
+			if map_type == D.MapType.RIVER or map_type == D.MapType.LAKE:
+				if not pg.find(spawns[0], first_gold).is_empty():
+					errs.append("seed %d: altina koprusuz ulasilabiliyor (ada delik)" % seed_v)
+			elif map_type == D.MapType.SNOW or map_type == D.MapType.PLAINS:
+				var mtn := 0
+				for i in grid.size():
+					if grid[i] == D.Tile.MOUNTAIN:
+						mtn += 1
+				if mtn < 8:
+					errs.append("seed %d: altin cevresinde dag cemberi yok (%d)" % [seed_v, mtn])
+				if pg.find(spawns[0], first_gold).is_empty():
+					errs.append("seed %d: altina gecitlerden ulasilamiyor" % seed_v)
 
 		# baglanti (tum tipler): spawnlar arasi yol var
 		var p := Pathing.new()

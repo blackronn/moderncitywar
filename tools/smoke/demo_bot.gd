@@ -30,6 +30,7 @@ func _go() -> void:
 	for bid: StringName in b_offsets:
 		sim.spawn_building(bid, 1, tl + b_offsets[bid], true)
 	sim.spawn_building(&"mine", 1, tl + Vector2i(0, -2), true)
+	sim.spawn_building(&"sandbags", 1, tl + Vector2i(-2, 2), true)
 	var u_offsets := {
 		&"rifleman": Vector2i(-2, 4),
 		&"sniper": Vector2i(-1, 5),

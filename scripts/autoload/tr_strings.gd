@@ -51,6 +51,7 @@ const S := {
 	&"quarry": "Taş Ocağı",
 	&"bridge_seg": "Köprü",
 	&"mine": "Mayın",
+	&"sandbags": "Kum Torbası",
 	&"barracks": "Kışla",
 	&"factory": "Fabrika",
 	&"turret": "Taret",

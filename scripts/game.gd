@@ -150,8 +150,8 @@ func spawn_entity_visual(id: int, def_id: StringName, owner_pid: int, pos: Vecto
 		# footprint sol-ustu pozisyondan turetilir; iki ucta ortak yol
 		var size: Vector2i = node.def["size"]
 		node.cell = Vector2i(((pos - Vector2(size) * D.TILE / 2.0) / D.TILE).round())
-		# kopru ve mayin yuruyusu ENGELLEMEZ (kopru su ustune gecis, mayin gizli)
-		if not node.def.has("bridge") and not node.def.has("mine"):
+		# kopru/mayin/siper yuruyusu ENGELLEMEZ (gecis, gizli, arkasinda durma)
+		if not node.def.has("bridge") and not node.def.has("mine") and not node.def.has("cover"):
 			pathing.set_rect_solid(node.cell, size, true)
 		# rakibin mayini bu ekranda gorunmez (host iki tarafi da sim'ler)
 		if node.def.has("mine") and owner_pid != GameState.my_pid:
@@ -166,7 +166,8 @@ func despawn_entity_visual(id: int, reason: int) -> void:
 	var node: Node = GameState.entities.get(id)
 	if node == null:
 		return
-	if node is BuildingScript and not node.def.has("bridge") and not node.def.has("mine"):
+	if node is BuildingScript and not node.def.has("bridge") and not node.def.has("mine") \
+			and not node.def.has("cover"):
 		pathing.set_rect_solid(node.cell, node.def["size"], false)
 	if reason == 1:
 		_death_visual(node)
