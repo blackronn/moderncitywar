@@ -4,7 +4,7 @@ extends Node
 ## preload edip dogrudan kullanir. Sim dosyalari da autoload yerine
 ## `const D := preload(...)` ile erisir.
 
-const VERSION := "0.6.1"
+const VERSION := "0.6.2"
 
 # --- oyuncular ---
 const MAX_PLAYERS := 4
@@ -30,7 +30,7 @@ const SPAWN_CLEAR_RADIUS := 5        # baslangic bolgesi temiz cim yaricapi
 const NEUTRAL_HALF_W := 4            # tarafsiz bolge: orta hattan iki yana bu kadar (altin burada)
 
 # --- zafer ---
-const METROPOLIS_POP := 40
+const METROPOLIS_POP := 200
 
 # --- ekonomi ---
 const START_RES := {"wood": 100, "stone": 50, "food": 50, "money": 50}

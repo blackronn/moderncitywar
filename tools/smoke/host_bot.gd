@@ -101,28 +101,26 @@ func _kill_hall(pid: int) -> void:
 
 
 func _build_metropolis(sim: Node) -> void:
+	## Hedefe gore OLCEKLENIR: METROPOLIS_POP degisse de smoke ayni kalir.
 	var tl: Vector2i = GameState.spawns[0]
-	# 9 ev (5 + 36 = 41 kapasite) + diger tum turler, tamamlanmis
-	var house_offs := [
-		Vector2i(4, 0), Vector2i(6, 0), Vector2i(8, 0),
-		Vector2i(4, 2), Vector2i(6, 2), Vector2i(8, 2),
-		Vector2i(4, 4), Vector2i(6, 4), Vector2i(8, 4),
-	]
-	for o: Vector2i in house_offs:
-		sim.spawn_building(&"house", 1, tl + o, true)
+	# kapasite: belediye 5 + ev basi 4 -> yeterli ev (+1 yedek)
+	var houses: int = (D.METROPOLIS_POP - 5 + 3) / 4 + 1
+	for i in houses:
+		# 7 kolonluk izgara, x>=6 (diger binalarin sagina; cakisme yok)
+		sim.spawn_building(&"house", 1, tl + Vector2i(6 + (i % 7) * 2, -6 + (i / 7) * 2), true)
 	sim.spawn_building(&"greenhouse", 1, tl + Vector2i(0, 4), true)
 	sim.spawn_building(&"bank", 1, tl + Vector2i(2, 4), true)
 	sim.spawn_building(&"lumber_camp", 1, tl + Vector2i(0, 8), true)
 	sim.spawn_building(&"quarry", 1, tl + Vector2i(2, 8), true)
 	sim.spawn_building(&"barracks", 1, tl + Vector2i(0, 6), true)
 	sim.spawn_building(&"factory", 1, tl + Vector2i(3, 6), true)
-	sim.spawn_building(&"turret", 1, tl + Vector2i(6, 6), true)
+	sim.spawn_building(&"turret", 1, tl + Vector2i(4, 4), true)
 	sim.recount_pop()
-	# nufusu 40'a tamamla (1 isci zaten var)
-	for i in 39:
-		var c: Vector2i = sim.pathing.nearest_free(tl + Vector2i(2 + (i % 6), -2 - (i / 6)), 6)
-		if c != Vector2i(-1, -1):
-			sim.spawn_unit(&"worker", 1, sim.cell_center(c))
+	# nufusu hedefe tamamla (1 isci zaten var); dogrudan hucre merkezine
+	# dogar (nearest_free degil: genis sayilarda sinir disina tasiyordu)
+	for i in D.METROPOLIS_POP - 1:
+		var c: Vector2i = tl + Vector2i(-3 + (i % 18), -9 + (i / 18))
+		sim.spawn_unit(&"worker", 1, sim.cell_center(c))
 	sim.recount_pop()
 
 
