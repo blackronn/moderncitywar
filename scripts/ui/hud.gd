@@ -1,13 +1,19 @@
 extends Control
-## HUD: ust bar (kaynaklar + nufus + savas durumu), toast akisi, alt panel
-## (secim bilgisi + insa menusu + uretim kuyrugu) ve oyun sonu overlay'i.
+## VoxGard HUD: ust bar (kaynaklar + gelir/sn + nufus + savas durumu),
+## sag ordu paneli (tur bazli toplu secim), alt panel (secim + insa/uretim/
+## gelistirme), toast akisi ve oyun sonu overlay'i. Stiller: UiKit (soft).
 
 const D := preload("res://scripts/autoload/defs.gd")
+const Bible := preload("res://scripts/sim/bible.gd")
+const UiKit := preload("res://scripts/ui/ui_kit.gd")
 const FONT := preload("res://assets/fonts/PublicPixel.ttf")
 
 const BUILDABLE: Array[StringName] = [
 	&"house", &"greenhouse", &"bank", &"lumber_camp", &"quarry",
 	&"barracks", &"factory", &"turret",
+]
+const ARMY_TYPES: Array[StringName] = [
+	&"worker", &"rifleman", &"sniper", &"rpg", &"healer", &"tank",
 ]
 
 var game: Node2D = null
@@ -17,11 +23,16 @@ var res_labels := {}
 var pop_label: Label
 var metro_label: Label
 var map_label: Label
+var war_label: Label
+var war_btn: Button
 var toasts: VBoxContainer
 var bottom: PanelContainer
 var sel_label: Label
 var action_box: HBoxContainer
 var queue_label: Label
+var army_panel: PanelContainer
+var army_box: VBoxContainer
+var army_buttons := {}
 var end_overlay: Control
 var end_title: Label
 var end_reason: Label
@@ -31,7 +42,6 @@ var _refresh_t := 0.0
 
 
 func _ready() -> void:
-	# CanvasLayer altindaki kok Control'de anchor'a guvenme: viewport'a elle otur
 	_fit_viewport()
 	get_viewport().size_changed.connect(_fit_viewport)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -39,16 +49,20 @@ func _ready() -> void:
 	# --- ust bar ---
 	var top := PanelContainer.new()
 	top.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	top.offset_left = 8.0
+	top.offset_right = -8.0
+	top.offset_top = 6.0
 	top.mouse_filter = Control.MOUSE_FILTER_STOP
+	UiKit.panel(top, 10.0, 5.0)
 	add_child(top)
 	var bar := HBoxContainer.new()
-	bar.add_theme_constant_override("separation", 22)
+	bar.add_theme_constant_override("separation", 20)
 	top.add_child(bar)
 	for kind in D.RES_KINDS:
-		var l := _mk_label(10)
+		var l := _mk_label(9)
 		res_labels[kind] = l
 		bar.add_child(l)
-	pop_label = _mk_label(10)
+	pop_label = _mk_label(9)
 	bar.add_child(pop_label)
 	metro_label = _mk_label(8)
 	metro_label.modulate = Color(1, 1, 1, 0.55)
@@ -56,32 +70,71 @@ func _ready() -> void:
 	var stretch := Control.new()
 	stretch.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.add_child(stretch)
-	# savas ilani kalkti (her an saldirilabilir); sag ust artik harita adini gosterir
+	war_btn = Button.new()
+	war_btn.text = Tr.t(&"declare_war")
+	UiKit.button(war_btn, 8, UiKit.ACCENT_RED)
+	war_btn.pressed.connect(_on_declare_pressed)
+	bar.add_child(war_btn)
+	war_label = _mk_label(9)
+	war_label.text = Tr.t(&"peace")
+	war_label.modulate = Color(0.6, 0.95, 0.6)
+	bar.add_child(war_label)
+	map_label = _mk_label(8)
 	var map_keys: Array[StringName] = [&"map_river", &"map_lake", &"map_plains"]
-	map_label = _mk_label(10)
 	map_label.text = Tr.t(&"map_label") % Tr.t(map_keys[GameState.map_type])
-	map_label.modulate = Color(1, 1, 1, 0.7)
+	map_label.modulate = Color(1, 1, 1, 0.5)
 	bar.add_child(map_label)
 
 	# --- toast akisi ---
 	toasts = VBoxContainer.new()
 	toasts.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	toasts.offset_top = 28.0
+	toasts.offset_top = 44.0
 	toasts.alignment = BoxContainer.ALIGNMENT_BEGIN
 	toasts.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(toasts)
 
+	# --- sag ordu paneli (tur bazli toplu secim) ---
+	army_panel = PanelContainer.new()
+	army_panel.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	army_panel.offset_right = -8.0
+	army_panel.offset_left = -86.0
+	army_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	UiKit.panel(army_panel, 10.0, 6.0)
+	add_child(army_panel)
+	army_box = VBoxContainer.new()
+	army_box.add_theme_constant_override("separation", 4)
+	army_panel.add_child(army_box)
+	var army_title := _mk_label(7)
+	army_title.text = Tr.t(&"army_panel")
+	army_title.modulate = Color(1, 1, 1, 0.5)
+	army_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	army_box.add_child(army_title)
+	for t in ARMY_TYPES:
+		var b := Button.new()
+		UiKit.button(b, 9)
+		b.icon = _unit_icon(t)
+		b.expand_icon = false
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.tooltip_text = Tr.t(t)
+		b.pressed.connect(_on_army_pressed.bind(t))
+		army_buttons[t] = b
+		army_box.add_child(b)
+
 	# --- alt panel ---
 	bottom = PanelContainer.new()
 	bottom.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	bottom.offset_top = -64.0
+	bottom.offset_left = 8.0
+	bottom.offset_right = -8.0
+	bottom.offset_top = -76.0
+	bottom.offset_bottom = -6.0
 	bottom.mouse_filter = Control.MOUSE_FILTER_STOP
+	UiKit.panel(bottom, 10.0, 7.0)
 	add_child(bottom)
 	var brow := HBoxContainer.new()
 	brow.add_theme_constant_override("separation", 14)
 	bottom.add_child(brow)
 	var info_box := VBoxContainer.new()
-	info_box.custom_minimum_size = Vector2(240, 0)
+	info_box.custom_minimum_size = Vector2(230, 0)
 	brow.add_child(info_box)
 	sel_label = _mk_label(10)
 	info_box.add_child(sel_label)
@@ -89,13 +142,13 @@ func _ready() -> void:
 	queue_label.modulate = Color(1, 1, 1, 0.8)
 	info_box.add_child(queue_label)
 	action_box = HBoxContainer.new()
-	action_box.add_theme_constant_override("separation", 6)
+	action_box.add_theme_constant_override("separation", 8)
 	brow.add_child(action_box)
 	bottom.visible = false
 
 	# --- oyun sonu overlay ---
 	end_overlay = ColorRect.new()
-	(end_overlay as ColorRect).color = Color(0.0, 0.0, 0.0, 0.65)
+	(end_overlay as ColorRect).color = Color(0.0, 0.0, 0.0, 0.66)
 	end_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	end_overlay.visible = false
 	end_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -114,31 +167,32 @@ func _ready() -> void:
 	end_box.add_child(end_reason)
 	var menu_btn := Button.new()
 	menu_btn.text = Tr.t(&"main_menu")
-	menu_btn.add_theme_font_override("font", FONT)
-	menu_btn.add_theme_font_size_override("font_size", 14)
-	menu_btn.custom_minimum_size = Vector2(240, 40)
+	UiKit.button(menu_btn, 13)
+	menu_btn.custom_minimum_size = Vector2(240, 44)
 	menu_btn.pressed.connect(_on_main_menu)
 	end_box.add_child(menu_btn)
 
 	Bus.resources_changed.connect(_on_res)
+	Bus.war_changed.connect(_on_war)
 	Bus.toast.connect(_toast)
 	Bus.game_over.connect(_on_game_over)
 	Bus.selection_changed.connect(_on_sel)
 	Bus.build_rejected.connect(_on_reject)
 	Bus.entity_level_changed.connect(_on_level_changed)
+	Bus.entity_spawned.connect(func(_n): _refresh_army())
+	Bus.entity_removed.connect(func(_i, _r): _refresh_army())
 	_on_res(GameState.my_pid)
+	_refresh_army()
 
 
 func _process(dt: float) -> void:
+	if GameState.war_state == D.War.COUNTDOWN:
+		GameState.war_t_left = maxf(0.0, GameState.war_t_left - dt)
+		war_label.text = Tr.t(&"war_countdown") % int(ceilf(GameState.war_t_left))
 	_refresh_t += dt
 	if _refresh_t >= 0.25:
 		_refresh_t = 0.0
 		_refresh_queue()
-
-
-func _on_level_changed(id: int) -> void:
-	if id in _sel:
-		_refresh_panel()
 
 
 func _fit_viewport() -> void:
@@ -148,13 +202,18 @@ func _fit_viewport() -> void:
 
 func _mk_label(font_size: int) -> Label:
 	var l := Label.new()
-	l.add_theme_font_override("font", FONT)
-	l.add_theme_font_size_override("font_size", font_size)
+	UiKit.label(l, font_size)
 	return l
 
 
+func _unit_icon(def_id: StringName) -> Texture2D:
+	var at := AtlasTexture.new()
+	at.atlas = load(Bible.unit_sheet(def_id, GameState.my_pid))
+	at.region = Rect2(0, 0, Bible.UNIT_FRAME, Bible.UNIT_FRAME)
+	return at
+
+
 func _cost_str(cost: Dictionary) -> String:
-	## Maliyeti tam kaynak adlariyla yazar: "50 Odun, 40 Taş"
 	var parts: Array[String] = []
 	for kind in cost:
 		parts.append("%d %s" % [cost[kind], Tr.t(StringName(kind))])
@@ -163,16 +222,30 @@ func _cost_str(cost: Dictionary) -> String:
 
 # === ust bar ===
 
+func _income_per_s(kind: String) -> float:
+	var total := 0.0
+	for e in GameState.entities.values():
+		if e.owner_pid != GameState.my_pid or not e.def.has("size") or not e.is_complete():
+			continue
+		var rate: Dictionary = e.def.get("rate", {})
+		if rate.has(kind):
+			total += rate[kind] * (1.0 + float(e.def.get("up_rate", 0.0)) * float(e.level - 1))
+	return total
+
+
 func _on_res(pid: int) -> void:
 	if pid != GameState.my_pid:
 		return
 	for kind in D.RES_KINDS:
 		var v: float = GameState.res[GameState.my_pid][kind]
-		res_labels[kind].text = "%s %d" % [Tr.t(StringName(kind)), int(v)]
+		var inc := _income_per_s(kind)
+		var txt := "%s %d" % [Tr.t(StringName(kind)), int(v)]
+		if inc > 0.0:
+			txt += " +%.1f/sn" % (inc)
+		res_labels[kind].text = txt
 	pop_label.text = "%s %d/%d" % [
 		Tr.t(&"pop"), GameState.pop_used[GameState.my_pid], GameState.pop_cap[GameState.my_pid]
 	]
-	# metropol ilerlemesi: nufus + tamamlanmis farkli bina turu sayisi
 	var have := {}
 	for e in GameState.entities.values():
 		if e.owner_pid == GameState.my_pid and e.def.has("size") and e.is_complete():
@@ -182,7 +255,47 @@ func _on_res(pid: int) -> void:
 	]
 
 
+func _on_declare_pressed() -> void:
+	Net.send_declare_war()
+
+
+func _on_war(state: int, _t_left: float) -> void:
+	war_btn.visible = state == D.War.PEACE
+	match state:
+		D.War.PEACE:
+			war_label.text = Tr.t(&"peace")
+			war_label.modulate = Color(0.6, 0.95, 0.6)
+		D.War.COUNTDOWN:
+			war_label.modulate = Color(1.0, 0.8, 0.3)
+		D.War.WAR:
+			war_label.text = Tr.t(&"at_war")
+			war_label.modulate = Color(1.0, 0.35, 0.3)
+
+
+# === ordu paneli ===
+
+func _refresh_army() -> void:
+	for t in ARMY_TYPES:
+		var n := 0
+		for e in GameState.entities.values():
+			if e.owner_pid == GameState.my_pid and e.def_id == t:
+				n += 1
+		var b: Button = army_buttons[t]
+		b.visible = n > 0
+		b.text = "x%d" % n
+
+
+func _on_army_pressed(t: StringName) -> void:
+	if input_ctrl != null:
+		input_ctrl.select_type(t)
+
+
 # === alt panel ===
+
+func _on_level_changed(id: int) -> void:
+	if id in _sel:
+		_refresh_panel()
+
 
 func _on_sel(ids: Array) -> void:
 	_sel = ids.duplicate()
@@ -236,7 +349,6 @@ func _refresh_panel() -> void:
 			var cancel := _action_btn(Tr.t(&"cancel"))
 			cancel.pressed.connect(Net.send_cancel_train.bind(first.id, 0))
 			action_box.add_child(cancel)
-		# gelistirme: maliyet + ne kazanacagi acikca yazilir
 		if first.def.has("up_cost") and first.level < D.MAX_LEVEL:
 			var up_cost := D.scaled_cost(first.def["up_cost"], first.level)
 			var up := _action_btn("%s L%d\n%s\n%s" % [
@@ -248,7 +360,6 @@ func _refresh_panel() -> void:
 
 
 func _stat_str(udef: Dictionary) -> String:
-	## Uretim butonunda birimin cani/hasari gorunsun
 	if udef.has("heal_rate"):
 		return "%s %d, %s" % [Tr.t(&"hp_short"), udef["hp"], Tr.t(&"heals_label")]
 	if udef.get("dmg", 0) <= 0:
@@ -271,8 +382,7 @@ func _benefit_str(bdef: Dictionary) -> String:
 func _action_btn(text: String) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.add_theme_font_override("font", FONT)
-	b.add_theme_font_size_override("font_size", 8)
+	UiKit.button(b, 8)
 	b.custom_minimum_size = Vector2(150, 56)
 	return b
 
@@ -310,6 +420,7 @@ func _on_reject(reason: int) -> void:
 		D.Reject.QUEUE_FULL: key = &"reject_queue_full"
 		D.Reject.PEACE: key = &"reject_peace"
 		D.Reject.MAX_LEVEL: key = &"reject_max_level"
+		D.Reject.BORDER: key = &"reject_border"
 		_: key = &"reject_bad_spot"
 	_toast(Tr.t(key))
 
@@ -319,10 +430,8 @@ func _on_reject(reason: int) -> void:
 func _toast(msg: String) -> void:
 	var l := Label.new()
 	l.text = msg
-	l.add_theme_font_override("font", FONT)
-	l.add_theme_font_size_override("font_size", 9)
+	UiKit.label(l, 9, Color(1.0, 0.97, 0.85))
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.add_theme_color_override("font_color", Color(1.0, 0.97, 0.85))
 	l.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 	l.add_theme_constant_override("shadow_offset_y", 1)
 	toasts.add_child(l)

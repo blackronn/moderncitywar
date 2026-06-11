@@ -49,4 +49,13 @@ func run() -> Array:
 			errs.append("yol su hucresinden gecti: %s" % str(pt))
 			break
 
+	# baris sinir grid'leri: kendi yarisinda yol VAR, rakip yariya YOK
+	var own_target := Vector2i(D.MAP_W / 2 - 3, 6)
+	if p.find(a, own_target, false, 1).is_empty():
+		errs.append("baris grid'i kendi yarisinda yol bulamadi")
+	if not p.find(a, b, false, 1).is_empty():
+		errs.append("baris grid'i rakip yariya yol verdi (sinir delik!)")
+	if not p.find(b, a, false, 2).is_empty():
+		errs.append("baris grid'i (P2) rakip yariya yol verdi")
+
 	return errs

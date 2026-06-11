@@ -4,8 +4,8 @@ extends Node
 
 const S := {
 	# genel
-	&"app_title": "MODERN CITY WAR",
-	&"subtitle": "İki belediye başkanı, tek harita.",
+	&"app_title": "VOXGARD",
+	&"subtitle": "İKİ BELEDİYE BAŞKANI · TEK HARİTA",
 	&"host_game": "Oyun Kur",
 	&"join_game": "Oyuna Katıl",
 	&"quit": "Çıkış",
@@ -72,6 +72,8 @@ const S := {
 	&"reject_blocked": "Alan dolu",
 	&"reject_queue_full": "Üretim kuyruğu dolu",
 	&"reject_peace": "Barış halinde saldıramazsın",
+	&"reject_border": "Savaş ilan etmeden sınır geçilemez!",
+	&"army_panel": "ORDU",
 	&"depleted": "Bir kaynak tükendi",
 
 	# uretim / insaat

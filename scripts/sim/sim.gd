@@ -43,9 +43,8 @@ func start_match() -> void:
 			spawn_unit(&"worker", pid, cell_center(wc))
 	recount_pop()
 	Net.ev(D.Ev.MATCH_STARTED)
-	# baris/ilan mekanigi kaldirildi: mac dogrudan savas halinde baslar,
-	# isteyen istedigi an saldirir
-	Net.ev(D.Ev.WAR_STATE, [D.War.WAR, 0.0])
+	# mac BARISTA baslar: sinirlar kapali, saldiri yok; "Savas Ilan Et" ->
+	# 30 sn geri sayim -> savas (sinirlar acilir, catisma serbest)
 	Net.bc_resources(1)
 	Net.bc_resources(2)
 
@@ -112,12 +111,13 @@ func despawn(node: Node, reason: int) -> void:
 # === komut isleyiciler ===
 
 func handle_move(pid: int, ids: PackedInt32Array, target: Vector2) -> void:
-	var cell := _px_to_cell(target)
+	var cell := _clamp_half(pid, _px_to_cell(target), true)
 	for u in _owned_units(pid, ids):
 		_set_move(u, cell)
 
 
 func handle_gather(pid: int, ids: PackedInt32Array, cell: Vector2i) -> void:
+	cell = _clamp_half(pid, cell, true)
 	var t := GameState.grid_at(cell)
 	if not D.TILE_RES.has(t):
 		handle_move(pid, ids, cell_center(cell))
@@ -130,14 +130,46 @@ func handle_gather(pid: int, ids: PackedInt32Array, cell: Vector2i) -> void:
 			_set_move(u, cell)
 
 
+func _at_peace() -> bool:
+	return GameState.war_state != D.War.WAR
+
+
+func _half_pid(pid: int) -> int:
+	## Baristayken yol aramalari oyuncunun kendi yarisina kisitlanir.
+	return pid if _at_peace() else 0
+
+
+func _clamp_half(pid: int, c: Vector2i, toast: bool = false) -> Vector2i:
+	## Baristayken hedefi orta hattin kendi tarafina ceker.
+	if not _at_peace():
+		return c
+	var mid := D.MAP_W / 2
+	var out := c
+	if pid == 1 and c.x >= mid:
+		out = Vector2i(mid - 1, c.y)
+	elif pid == 2 and c.x < mid:
+		out = Vector2i(mid, c.y)
+	if toast and out != c:
+		Net.reject_to(pid, D.Reject.BORDER)
+	return out
+
+
 func handle_build(pid: int, def_id: StringName, top_left: Vector2i, builders: PackedInt32Array) -> void:
 	if not D.is_building(def_id) or def_id == &"city_hall":
 		Net.reject_to(pid, D.Reject.INVALID)
 		return
 	var bdef := D.building(def_id)
 	var afford: bool = GameState.can_afford(pid, bdef["cost"])
+	var bmin := -1
+	var bmax := 9999
+	if _at_peace():
+		if pid == 1:
+			bmax = D.MAP_W / 2 - 1
+		else:
+			bmin = D.MAP_W / 2
 	var verdict := validate_placement(
-		GameState.grid, pathing, _unit_cells(), _own_building_rects(pid), bdef, top_left, afford)
+		GameState.grid, pathing, _unit_cells(), _own_building_rects(pid), bdef, top_left,
+		afford, bmin, bmax)
 	if verdict != -1:
 		Net.reject_to(pid, verdict)
 		return
@@ -232,7 +264,7 @@ func handle_attack(pid: int, ids: PackedInt32Array, target_id: int) -> void:
 		return
 	for u in _owned_units(pid, ids):
 		if u.def["dmg"] > 0:
-			u.task = {"kind": &"attack", "tid": target_id, "cell": _cell_of(tgt)}
+			u.task = {"kind": &"attack", "tid": target_id, "ptid": target_id, "cell": _cell_of(tgt)}
 			u.repath_block = 0
 		else:
 			_set_move(u, _cell_of(tgt))   # silahsizlar (isci) sadece yurur
@@ -253,14 +285,18 @@ func force_game_over(winner: int, reason: int) -> void:
 # === yerlestirme dogrulamasi (saf/statik: testler dogrudan cagirir) ===
 
 static func validate_placement(grid: PackedInt32Array, p_pathing, unit_cells: Array,
-		own_rects: Array, bdef: Dictionary, top_left: Vector2i, afford: bool) -> int:
+		own_rects: Array, bdef: Dictionary, top_left: Vector2i, afford: bool,
+		min_x := -1, max_x := 9999) -> int:
 	## -1 = gecerli, aksi halde D.Reject.* nedeni.
+	## min_x/max_x: baris sinirlari (kendi yarin disina insaat yok).
 	var size: Vector2i = bdef["size"]
 	for dy in size.y:
 		for dx in size.x:
 			var c := top_left + Vector2i(dx, dy)
 			if c.x < 0 or c.y < 0 or c.x >= D.MAP_W or c.y >= D.MAP_H:
 				return D.Reject.BAD_SPOT
+			if c.x < min_x or c.x > max_x:
+				return D.Reject.BORDER
 			if grid[c.y * D.MAP_W + c.x] != D.Tile.GRASS:
 				return D.Reject.BAD_SPOT
 			if p_pathing.is_solid(c):
@@ -393,12 +429,27 @@ func _tick_combat(dt: float) -> void:
 		var tgt: Node = null
 		if u.task.get("kind") == &"attack":
 			tgt = GameState.ent(u.task.get("tid", 0))
+			# asil hedef (oyuncunun emri) ayri tutulur: araya giren olunce donulur
+			var ptid: int = u.task.get("ptid", 0)
+			if tgt == null and ptid != 0:
+				tgt = GameState.ent(ptid)
+				if tgt != null:
+					u.task["tid"] = ptid
+					u.repath_block = 0
+			# savas zekasi: hedef bina ise ve menzile dusman BIRIMI girdiyse
+			# once onu hallet (binayi doverken kesilmemek icin)
+			if tgt != null and tgt.def.has("size"):
+				var intr := _nearest_enemy_unit(u, u.def["aggro_t"])
+				if intr != null:
+					tgt = intr
+					u.task["tid"] = intr.id
+					u.repath_block = 0
 			if tgt == null:
 				u.task = {"kind": &"idle"}
 		if tgt == null and u.task.get("kind") == &"idle":
 			tgt = _nearest_enemy(u, u.def["aggro_t"])
 			if tgt != null:
-				u.task = {"kind": &"attack", "tid": tgt.id, "cell": _cell_of(tgt)}
+				u.task = {"kind": &"attack", "tid": tgt.id, "ptid": 0, "cell": _cell_of(tgt)}
 				u.repath_block = 0
 		if tgt != null:
 			_combat_step(u, tgt, dt)
@@ -437,8 +488,10 @@ func _chase(u: Node, tgt: Node, dt: float) -> void:
 		need = maxi(absi(endc.x - goal.x), absi(endc.y - goal.y)) > 1
 	if need:
 		u.task["cell"] = goal
-		u.path = pathing.find(u.cell(), goal, true)
+		u.path = pathing.find(u.cell(), goal, true, _half_pid(u.owner_pid))
 		u.path_i = 0
+		if u.path.size() > 1 and u.path[0] == u.cell():
+			u.path_i = 1
 		u.repath_block = 15
 	_follow(u, dt)
 
@@ -505,10 +558,24 @@ func _fire(att: Node, tgt: Node) -> void:
 	# gelistirilmis taret: seviye basina sabit ek hasar
 	if att.def.has("up_dmg"):
 		dmg += float(att.def["up_dmg"]) * float(att.level - 1)
-	tgt.set_hp(tgt.hp - dmg)
 	Net.ev(D.Ev.TRACER, [att.position, tgt.position, 0])
-	if tgt.hp <= 0.0:
-		_kill(tgt)
+	# alan hasari (rpg/tank): hedefin cevresindeki dusman varliklarina %50
+	var victims: Array = [[tgt, dmg]]
+	var splash: float = att.def.get("splash_t", 0.0)
+	if splash > 0.0:
+		Net.ev(D.Ev.IMPACT, [tgt.position, 0.8])
+		for o in GameState.entities.values():
+			if o == tgt or o.owner_pid != tgt.owner_pid:
+				continue
+			if _dist_t(o, tgt) <= splash:
+				victims.append([o, attack_damage(att.def_id, att.def, o.def_id, o.def, 0.0) * 0.5])
+	for v in victims:
+		var n: Node = v[0]
+		n.set_hp(n.hp - v[1])
+	for v in victims:
+		var n: Node = v[0]
+		if GameState.entities.has(n.id) and n.hp <= 0.0:
+			_kill(n)
 
 
 func _kill(tgt: Node) -> void:
@@ -545,6 +612,20 @@ func _dist_t(a: Node, b: Node) -> float:
 		var ra: Rect2 = a.footprint_px()
 		p = q.clamp(ra.position, ra.position + ra.size)
 	return p.distance_to(q) / float(D.TILE)
+
+
+func _nearest_enemy_unit(e: Node, range_t: float) -> Node:
+	var enemy := GameState.enemy_of(e.owner_pid)
+	var best: Node = null
+	var bd := 1e9
+	for o in GameState.entities.values():
+		if o.owner_pid != enemy or not o.def.has("speed_t"):
+			continue
+		var d := _dist_t(e, o)
+		if d <= range_t and d < bd:
+			bd = d
+			best = o
+	return best
 
 
 func _nearest_enemy(e: Node, range_t: float) -> Node:
@@ -619,14 +700,19 @@ func _separate_units() -> void:
 			for j in range(i + 1, arr.size()):
 				var a: Node = arr[i]
 				var b: Node = arr[j]
+				# aktif yol izleyenleri itme: hareketle bogusup titremesinler
+				var a_idle: bool = a.path_i >= a.path.size()
+				var b_idle: bool = b.path_i >= b.path.size()
+				if not a_idle and not b_idle:
+					continue
 				var dv: Vector2 = a.position - b.position
 				var dl := dv.length()
 				if dl >= 10.0:
 					continue
 				var push := dv.normalized() * 0.5 if dl > 0.01 else Vector2(0.5, 0.0)
-				if not pathing.is_solid(_px_to_cell(a.position + push)):
+				if a_idle and not pathing.is_solid(_px_to_cell(a.position + push)):
 					a.position += push
-				if not pathing.is_solid(_px_to_cell(b.position - push)):
+				if b_idle and not pathing.is_solid(_px_to_cell(b.position - push)):
 					b.position -= push
 
 
@@ -639,8 +725,12 @@ func _set_move(u: Node, cell: Vector2i) -> void:
 
 func _repath(u: Node) -> void:
 	var goal: Vector2i = u.task.get("cell", u.cell())
-	u.path = pathing.find(u.cell(), goal, true)
+	u.path = pathing.find(u.cell(), goal, true, _half_pid(u.owner_pid))
 	u.path_i = 0
+	# ilk nokta zaten icinde oldugumuz hucreyse atla: birim once kendi hucre
+	# merkezine GERI yurumesin (sag-tik gecikmesi/ileri-geri titremesi buydu)
+	if u.path.size() > 1 and u.path[0] == u.cell():
+		u.path_i = 1
 	if u.path.is_empty():
 		u.task = {"kind": &"idle"}
 
@@ -689,7 +779,7 @@ func _do_gather(u: Node, c: Vector2i, dt: float) -> void:
 
 func _retarget_gather(u: Node, from_c: Vector2i) -> void:
 	var tile_kind: int = u.task.get("tile", -1)
-	var best := _nearest_node(from_c, tile_kind)
+	var best := _nearest_node(from_c, tile_kind, u.owner_pid)
 	if best == Vector2i(-1, -1):
 		u.task = {"kind": &"idle"}
 		Net.toast_to(u.owner_pid, &"depleted")
@@ -698,12 +788,15 @@ func _retarget_gather(u: Node, from_c: Vector2i) -> void:
 		_repath(u)
 
 
-func _nearest_node(from_c: Vector2i, tile_kind: int) -> Vector2i:
+func _nearest_node(from_c: Vector2i, tile_kind: int, pid: int) -> Vector2i:
 	var best := Vector2i(-1, -1)
 	var best_d := 9999
+	var mid := D.MAP_W / 2
 	for c: Vector2i in node_res:
 		if GameState.grid_at(c) != tile_kind:
 			continue
+		if _at_peace() and ((pid == 1 and c.x >= mid) or (pid == 2 and c.x < mid)):
+			continue   # baristayken sinir otesindeki kaynaga gidilmez
 		var dd := maxi(absi(c.x - from_c.x), absi(c.y - from_c.y))
 		if dd <= D.GATHER_RETARGET_T and dd < best_d:
 			best_d = dd

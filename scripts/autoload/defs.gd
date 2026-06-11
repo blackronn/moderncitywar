@@ -4,7 +4,7 @@ extends Node
 ## preload edip dogrudan kullanir. Sim dosyalari da autoload yerine
 ## `const D := preload(...)` ile erisir.
 
-const VERSION := "0.1.0"
+const VERSION := "0.3.0"
 
 # --- zaman / ag ---
 const TICK_RATE := 30
@@ -36,9 +36,9 @@ enum Tile { GRASS, WATER, BRIDGE, FOREST, STONE }
 enum Klass { INFANTRY, ARMOR, BUILDING }
 enum War { PEACE, COUNTDOWN, WAR }
 enum MapType { RIVER, LAKE, PLAINS }
-enum Ev { MATCH_STARTED, WAR_STATE, DEPLETED, BUILD_REJECTED, TRACER, TOAST_KEY, LEVEL }
+enum Ev { MATCH_STARTED, WAR_STATE, DEPLETED, BUILD_REJECTED, TRACER, TOAST_KEY, LEVEL, IMPACT }
 enum Reason { DESTRUCTION, METROPOLIS, OPPONENT_LEFT }
-enum Reject { NO_RES, BAD_SPOT, TOO_FAR, POP_FULL, BLOCKED, QUEUE_FULL, PEACE, INVALID, MAX_LEVEL }
+enum Reject { NO_RES, BAD_SPOT, TOO_FAR, POP_FULL, BLOCKED, QUEUE_FULL, PEACE, INVALID, MAX_LEVEL, BORDER }
 
 # bina gelistirme
 const MAX_LEVEL := 3
@@ -73,10 +73,12 @@ const UNITS := {
 	&"rpg": {
 		"cost": {"food": 60, "money": 60}, "hp": 70, "dmg": 30, "range_t": 4.0, "cooldown_s": 3.0,
 		"speed_t": 1.8, "pop": 1, "klass": Klass.INFANTRY, "train_s": 12.0, "aggro_t": 5.0,
+		"splash_t": 1.2,   # alan hasari yaricapi (tile); cevredekilere %50
 	},
 	&"tank": {
 		"cost": {"money": 150, "stone": 80}, "hp": 450, "dmg": 24, "range_t": 4.0, "cooldown_s": 2.0,
 		"speed_t": 1.4, "pop": 3, "klass": Klass.ARMOR, "train_s": 15.0, "aggro_t": 5.0,
+		"splash_t": 1.0,
 	},
 	&"healer": {
 		"cost": {"food": 50, "money": 30}, "hp": 70, "dmg": 0, "range_t": 2.5, "cooldown_s": 0.0,

@@ -169,6 +169,15 @@ func _command(wp: Vector2) -> void:
 		Net.send_move(unit_ids, wp)
 
 
+func select_type(def_id: StringName) -> void:
+	## Ordu panelinden: bu turdeki TUM kendi birimlerini sec.
+	var ids: Array[int] = []
+	for e in GameState.entities.values():
+		if e.owner_pid == GameState.my_pid and e.def_id == def_id and e.def.has("speed_t"):
+			ids.append(e.id)
+	_set_selection(ids)
+
+
 func _pick_own_building(wp: Vector2) -> Node:
 	for e in GameState.entities.values():
 		if e.owner_pid == GameState.my_pid and e.def.has("size") and e.footprint_px().has_point(wp):

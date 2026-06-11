@@ -442,6 +442,10 @@ func _apply_event(kind: int, args: Array) -> void:
 				node.level = args[1]
 				node.queue_redraw()
 				Bus.entity_level_changed.emit(args[0])
+		D.Ev.IMPACT:
+			var scene := get_tree().current_scene
+			if scene != null and scene.has_method("spawn_fx"):
+				scene.spawn_fx(&"explosion", args[0], args[1])
 
 
 func _apply_game_over(winner: int, reason: int) -> void:

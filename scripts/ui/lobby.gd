@@ -5,6 +5,7 @@ extends Control
 static var mode := "host"
 
 const FONT := preload("res://assets/fonts/PublicPixel.ttf")
+const UiKit := preload("res://scripts/ui/ui_kit.gd")
 
 var status: Label
 var ip_edit: LineEdit
@@ -12,7 +13,7 @@ var ip_edit: LineEdit
 
 func _ready() -> void:
 	var bg := ColorRect.new()
-	bg.color = Color(0.07, 0.13, 0.10)
+	bg.color = UiKit.BG
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
@@ -24,10 +25,17 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 14)
 	center.add_child(box)
 
+	var wordmark := TextureRect.new()
+	wordmark.texture = load("res://assets/ui/voxgard-wordmark.png")
+	wordmark.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	wordmark.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	wordmark.custom_minimum_size = Vector2(280, 56)
+	box.add_child(wordmark)
+
 	var title := Label.new()
 	title.text = Tr.t(&"host_game") if mode == "host" else Tr.t(&"join_game")
 	title.add_theme_font_override("font", FONT)
-	title.add_theme_font_size_override("font_size", 24)
+	title.add_theme_font_size_override("font_size", 16)
 	title.add_theme_color_override("font_color", Color(0.93, 0.89, 0.62))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
@@ -57,17 +65,15 @@ func _ready() -> void:
 		box.add_child(ip_edit)
 		var connect_btn := Button.new()
 		connect_btn.text = Tr.t(&"connect")
-		connect_btn.add_theme_font_override("font", FONT)
-		connect_btn.add_theme_font_size_override("font_size", 14)
-		connect_btn.custom_minimum_size = Vector2(300, 40)
+		UiKit.button(connect_btn, 14, UiKit.ACCENT_BLUE)
+		connect_btn.custom_minimum_size = Vector2(300, 44)
 		connect_btn.pressed.connect(_on_connect)
 		box.add_child(connect_btn)
 
 	var back := Button.new()
 	back.text = Tr.t(&"back")
-	back.add_theme_font_override("font", FONT)
-	back.add_theme_font_size_override("font_size", 12)
-	back.custom_minimum_size = Vector2(300, 34)
+	UiKit.button(back, 11)
+	back.custom_minimum_size = Vector2(300, 36)
 	back.pressed.connect(_on_back)
 	box.add_child(back)
 

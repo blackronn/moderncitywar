@@ -5,10 +5,10 @@ config_version=5
 
 [application]
 
-config/name="Modern City War"
+config/name="VoxGard"
 run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.6")
-config/icon="res://icon.svg"
+config/icon="res://assets/ui/voxgard-emblem.png"
 
 [autoload]
 

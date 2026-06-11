@@ -1,11 +1,14 @@
-# Modern City War
+# VoxGard
+
+![VoxGard](assets/ui/voxgard-lockup-dark.png)
 
 > **"İki belediye başkanı, tek harita."** — 2 kişilik online şehir kurma + savaş oyunu.
 
 Simetrik bir pixel-art haritanın iki yakasında birer şehir. Üç harita tipi (seed seçer):
 **Nehir** (2–3 köprü, doğal cephe hattı), **Göl** (kıyılardan dolaşılır) ve **Ova**
-(açık cephe, bol orman). Herkes **Belediye Binası + 1 işçiyle** başlar; işçiyle odun/taş
-toplar, şehir kurar, nüfusunu büyütür — ve **istediği an saldırır** (ilan yok, siren yok).
+(açık cephe, bol orman). Herkes **Belediye Binası + 1 işçiyle** başlar. Oyun **barışta**
+başlar: orta hattaki sınır kapalıdır — birimler geçemez, sınır ötesine inşaat yapılamaz.
+**"Savaş İlan Et"** → 30 saniyelik siren → sınırlar açılır, çatışma serbest.
 
 **İki zafer yolu:**
 
@@ -55,9 +58,10 @@ Oyunu aç (`tools\godot.ps1 --path .`) — bir oyuncu **Oyun Kur**, diğeri **Oy
 ### Birimler ve counter üçgeni
 
 İşçi (toplar/inşa eder; yarım inşaata sağ tıkla devam ettirir) · **Piyade** (ucuz) ·
-**Nişancı** (uzun menzil, piyadeye ×2) · **RPG'ci** (zırh/binaya ×2.5) · **Tank**
-(piyadeye ×1.5, etli) · **Sıhhiyeci** (hasarlı dostları kendiliğinden iyileştirir).
+**Nişancı** (uzun menzil, piyadeye ×2) · **RPG'ci** (zırh/binaya ×2.5, **alan hasarı**) ·
+**Tank** (piyadeye ×1.5, etli, **alan hasarı**) · **Sıhhiyeci** (hasarlı dostları iyileştirir).
 Piyade yaklaşırsa nişancıyı döver; RPG tankı eritir; tank piyadeyi biçer. Taret savunur.
+Sağdaki **ORDU paneli** ile bir türün tüm birimlerini tek tıkla seçersin.
 
 ### Ekonomi ve geliştirme
 

@@ -51,6 +51,10 @@ func _ready() -> void:
 	add_child(features)
 	TileCatalog.paint(terrain, features, GameState.grid)
 
+	var border: Node2D = preload("res://scripts/border_line.gd").new()
+	border.name = "BorderLine"
+	add_child(border)
+
 	entities = Node2D.new()
 	entities.name = "Entities"
 	entities.y_sort_enabled = true

@@ -52,12 +52,14 @@ func _run_war() -> void:
 	var ids := PackedInt32Array()
 	for u in _army():
 		ids.append(u.id)
-	# ilan mekanigi yok: mac savas halinde baslar, dogrudan saldir
+	# baris halinde saldiri reddedilmeli (sinir/ilan mekanigi geri geldi)
+	print("BOT_CLIENT savas ilan ediyor")
+	Net.send_declare_war()
 	while not _finished and GameState.war_state != D.War.WAR:
 		await get_tree().create_timer(0.25).timeout
 	if _finished:
 		return
-	print("BOT_CLIENT saldiri basliyor")
+	print("BOT_CLIENT savas basladi, saldiri")
 	Net.send_attack(ids, hall.id)
 
 
