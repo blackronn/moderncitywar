@@ -33,9 +33,26 @@ powershell -ExecutionPolicy Bypass -File tools\godot.ps1 --path . --import   # i
 
 Asset'ler repoda hazır (CC0). Yeniden indirmek istersen: `tools\get_assets.ps1`.
 
+## Tek dosya EXE (arkadaşına gönder)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\export.ps1
+```
+
+`export\VoxGard.exe` üretir (pck gömülü, tek dosya). İlk çalıştırmada Godot export
+şablonlarını indirir (~1.1 GB, tek seferlik); sonraki export'lar saniyeler sürer.
+Arkadaşına **sadece exe'yi** gönder — Godot kurması gerekmez. Notlar:
+
+- Windows SmartScreen uyarısında **Daha fazla bilgi → Yine de çalıştır** de
+  (exe imzasız; kendi derlemen).
+- Host olan ilk açılışta güvenlik duvarı izni vermeli (8910/UDP).
+- **Sürüm eşleşmeli:** oyun her güncellendiğinde exe'yi yeniden üret ve yeniden
+  gönder; eski exe "Sürüm uyumsuz" der.
+
 ## Oynama
 
 Oyunu aç (`tools\godot.ps1 --path .`) — bir oyuncu **Oyun Kur**, diğeri **Oyuna Katıl** + host'un IP'si.
+**2-4 oyuncu:** herkes bağlandıktan sonra host lobide **Maçı Başlat**'a basar.
 
 - **Aynı ağda (LAN/yurt/ev):** doğrudan çalışır; host'un lobide görünen IP'sine bağlan.
 - **İnternet üzerinden (önerilen): [Tailscale](https://tailscale.com)** — iki tarafa da kur,
