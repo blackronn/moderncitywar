@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face { font-family:'PublicPixel'; src:url('assets/fonts/PublicPixel.ttf') format('truetype'); font-display:swap; }
+* { box-sizing:border-box; }
+html,body { margin:0; padding:0; }
+canvas[data-icon], canvas[data-scene] { image-rendering:pixelated; image-rendering:crisp-edges; display:block; }
+@keyframes vgpulse { 0%,100%{ filter:brightness(1);} 50%{ filter:brightness(1.35);} }
+@keyframes vgblink { 0%,100%{ opacity:1;} 50%{ opacity:0.35;} }
+@keyframes vgrise { 0%{ transform:translateY(6px); opacity:0;} 12%,80%{ transform:translateY(0); opacity:1;} 100%{ transform:translateY(-4px); opacity:0;} }
+</style>
+</helmet>
+<div ref="{{ setRoot }}" style="{{ rootStyle }}">
+
+  <!-- ===== HEADER ===== -->
+  <header style="max-width:1340px; margin:0 auto; padding:42px 40px 22px; display:flex; align-items:flex-end; justify-content:space-between; gap:28px; flex-wrap:wrap;">
+    <div>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:13px;">
+        <div style="width:26px; height:26px; background:#3a78d8; box-shadow:5px 0 0 #dc4636;"></div>
+        <span style="font-family:'PublicPixel'; font-size:10px; letter-spacing:1px; color:#8b94a7;">MODERN CITY WAR</span>
+      </div>
+      <h1 style="font-family:'PublicPixel'; font-size:26px; line-height:1.4; margin:0; color:#fff; text-shadow:3px 3px 0 #000;">HUD YENİDEN TASARIMI</h1>
+      <p style="margin:14px 0 0; max-width:560px; color:#9aa3b5; font-size:14px; line-height:1.6;">Zengin pixel paneller — bevel çerçeve, perçinler, ikon kartları. Haritadaki binalara/birimlere tıkla, savaş rozetine bas; alt panel canlı değişir.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:10px; align-items:flex-end;">
+      <span style="font-family:'PublicPixel'; font-size:8px; color:#6b7488; letter-spacing:1px;">STİL</span>
+      <div style="display:flex; gap:8px;">
+        <button onClick="{{ styleWood }}" style="{{ styleWoodBtn }}">AHŞAP & TAŞ</button>
+        <button onClick="{{ styleSteel }}" style="{{ styleSteelBtn }}">TAŞ & DEMİR</button>
+      </div>
+    </div>
+  </header>
+
+  <main style="max-width:1340px; margin:0 auto; padding:0 40px;">
+
+    <!-- ===== SECTION 01 — LIVE HUD ===== -->
+    <section style="padding:30px 0 10px;">
+      <div style="display:flex; align-items:baseline; gap:14px; margin-bottom:16px;">
+        <span style="font-family:'PublicPixel'; font-size:9px; color:#6b7488;">01</span>
+        <h2 style="font-family:'PublicPixel'; font-size:15px; margin:0; color:#fff;">OYUN İÇİ HUD · CANLI MOCK</h2>
+      </div>
+
+      <div style="position:relative; width:100%; aspect-ratio:16/9; border-radius:8px; overflow:hidden; box-shadow:0 0 0 3px #0a0d12, 0 18px 50px rgba(0,0,0,0.5);">
+        <!-- backdrop map -->
+        <div style="position:absolute; inset:0; background:#5fb84f; background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,0.05) 1px, transparent 0); background-size:9px 9px;"></div>
+        <div style="position:absolute; left:50%; top:46%; transform:translate(-50%,-50%); width:42%; height:54%; background:radial-gradient(circle at 50% 45%, #4a9fe0 0%, #2f7fcf 62%, #2a72bd 100%); border-radius:48% 52% 50% 50%/52% 48% 52% 48%; box-shadow:inset 0 6px 14px rgba(255,255,255,0.18), inset 0 -8px 16px rgba(0,0,0,0.12);"></div>
+        <!-- decorative trees -->
+        <canvas data-scene="tree" data-s="2" width="32" height="32" style="position:absolute; left:16%; top:30%; width:32px; height:32px;"></canvas>
+        <canvas data-scene="tree" data-s="2" width="32" height="32" style="position:absolute; left:21%; top:33%; width:32px; height:32px;"></canvas>
+        <canvas data-scene="tree" data-s="2" width="32" height="32" style="position:absolute; left:78%; top:28%; width:32px; height:32px;"></canvas>
+        <canvas data-scene="tree" data-s="2" width="32" height="32" style="position:absolute; left:82%; top:66%; width:32px; height:32px;"></canvas>
+        <canvas data-scene="tree" data-s="2" width="32" height="32" style="position:absolute; left:15%; top:64%; width:32px; height:32px;"></canvas>
+
+        <!-- clickable tokens -->
+        <div onClick="{{ selCityhall }}" title="Belediye" style="{{ tokWrap }} left:22%; top:52%;">
+          <div style="{{ selRingCityhall }}"></div>
+          <canvas data-icon="bld:city_hall" data-s="2.6" width="42" height="42" style="width:42px; height:42px; cursor:pointer;"></canvas>
+        </div>
+        <div onClick="{{ selWorker }}" title="İşçi" style="{{ tokWrap }} left:30%; top:60%;">
+          <div style="{{ selRingWorker }}"></div>
+          <canvas data-icon="unit:worker" data-s="1.7" width="28" height="28" style="width:28px; height:28px; cursor:pointer;"></canvas>
+        </div>
+        <div onClick="{{ selBarracks }}" title="Kışla" style="{{ tokWrap }} left:35%; top:46%;">
+          <div style="{{ selRingBarracks }}"></div>
+          <canvas data-icon="bld:barracks" data-s="2.3" width="37" height="37" style="width:37px; height:37px; cursor:pointer;"></canvas>
+        </div>
+        <div onClick="{{ selFactory }}" title="Fabrika" style="{{ tokWrap }} left:27%; top:72%;">
+          <div style="{{ selRingFactory }}"></div>
+          <canvas data-icon="bld:factory" data-s="2.3" width="37" height="37" style="width:37px; height:37px; cursor:pointer;"></canvas>
+        </div>
+        <div onClick="{{ selTank }}" title="Tank" style="{{ tokWrap }} left:42%; top:66%;">
+          <div style="{{ selRingTank }}"></div>
+          <canvas data-icon="unit:tank" data-s="1.9" width="31" height="31" style="width:31px; height:31px; cursor:pointer;"></canvas>
+        </div>
+        <!-- enemy -->
+        <div style="{{ tokWrap }} left:75%; top:50%; pointer-events:none;">
+          <canvas data-icon="bld:city_hall_red" data-s="2.6" width="42" height="42" style="width:42px; height:42px;"></canvas>
+        </div>
+
+        <!-- ===== TOP BAR ===== -->
+        <div style="position:absolute; top:10px; left:10px; right:10px; height:46px; padding:0 8px 0 8px; display:flex; align-items:center; gap:10px; {{ S_PANEL }}">
+          <span style="{{ rivetTL }}"></span><span style="{{ rivetTR }}"></span><span style="{{ rivetBL }}"></span><span style="{{ rivetBR }}"></span>
+          <!-- resources -->
+          <div style="display:flex; align-items:center; gap:6px;">
+            <sc-for list="{{ resources }}" as="r" hint-placeholder-count="4">
+              <div style="display:flex; align-items:center; gap:5px; padding:4px 8px 4px 5px; {{ S_POD }}">
+                <canvas data-icon="{{ r.canvasId }}" data-s="1.5" width="24" height="24" style="width:24px; height:24px;"></canvas>
+                <span style="font-family:'PublicPixel'; font-size:11px; color:var(--ink); min-width:26px;">{{ r.val }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <!-- pop -->
+          <div style="display:flex; align-items:center; gap:6px; padding:4px 9px 4px 6px; {{ S_POD }}">
+            <canvas data-icon="ui:pop" data-s="1.5" width="24" height="24" style="width:24px; height:24px;"></canvas>
+            <div style="display:flex; flex-direction:column; gap:3px;">
+              <span style="font-family:'PublicPixel'; font-size:10px; color:var(--ink);">{{ popText }}</span>
+              <div style="width:62px; height:5px; background:rgba(0,0,0,0.4); border-radius:2px; overflow:hidden;"><div style="height:100%; width:{{ popPct }}; background:linear-gradient(#7fb0ff,#3a78d8);"></div></div>
+            </div>
+          </div>
+          <!-- metropolis -->
+          <div style="display:flex; flex-direction:column; gap:3px; padding:4px 10px; {{ S_POD }}">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-family:'PublicPixel'; font-size:8px; color:var(--accent); letter-spacing:1px;">METROPOL</span>
+              <span style="font-family:'PublicPixel'; font-size:8px; color:var(--dim);">{{ metroPopText }}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <div style="width:96px; height:6px; background:rgba(0,0,0,0.4); border-radius:2px; overflow:hidden;"><div style="height:100%; width:{{ metroPct }}; background:linear-gradient(var(--accent),var(--accent2));"></div></div>
+              <div style="display:flex; gap:2px;">
+                <sc-for list="{{ binaDots }}" as="d" hint-placeholder-count="9">
+                  <span style="width:5px; height:5px; border-radius:1px; background:{{ d.col }};"></span>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex:1;"></div>
+
+          <!-- map badge -->
+          <div style="display:flex; align-items:center; gap:6px; padding:5px 10px; {{ S_POD }}">
+            <span style="font-family:'PublicPixel'; font-size:8px; color:var(--dim);">HARİTA</span>
+            <span style="font-family:'PublicPixel'; font-size:9px; color:var(--ink);">GÖL</span>
+          </div>
+          <!-- war -->
+          <button onClick="{{ cycleWar }}" style="{{ warBtnStyle }}">{{ warLabel }}</button>
+        </div>
+
+        <!-- ===== SIDE ORDU PANEL ===== -->
+        <div style="position:absolute; top:64px; right:10px; width:146px; padding:8px 9px 9px; {{ S_PANEL }}">
+          <span style="{{ rivetTL }}"></span><span style="{{ rivetTR }}"></span><span style="{{ rivetBL }}"></span><span style="{{ rivetBR }}"></span>
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+            <span style="font-family:'PublicPixel'; font-size:9px; color:var(--accent); letter-spacing:1px;">ORDU</span>
+            <span style="font-family:'PublicPixel'; font-size:8px; color:var(--dim);">{{ armyPop }}</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <sc-for list="{{ ordu }}" as="u" hint-placeholder-count="4">
+              <div onClick="{{ u.onPick }}" style="display:flex; align-items:center; gap:7px; padding:3px 6px; cursor:pointer; {{ S_POD }}">
+                <canvas data-icon="{{ u.canvasId }}" data-s="1.25" width="20" height="20" style="width:20px; height:20px;"></canvas>
+                <span style="font-family:'PublicPixel'; font-size:8px; color:var(--ink); flex:1;">{{ u.name }}</span>
+                <span style="font-family:'PublicPixel'; font-size:10px; color:var(--accent);">{{ u.countText }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- ===== MINIMAP ===== -->
+        <div style="position:absolute; bottom:122px; right:10px; width:146px; height:80px; padding:7px; {{ S_PANEL }}">
+          <span style="{{ rivetTL }}"></span><span style="{{ rivetTR }}"></span><span style="{{ rivetBL }}"></span><span style="{{ rivetBR }}"></span>
+          <div style="position:relative; width:100%; height:100%; border-radius:2px; overflow:hidden; box-shadow:inset 2px 2px 0 var(--bevel-lo), inset -1px -1px 0 var(--bevel-hi);">
+            <canvas data-scene="minimap" data-s="2" width="268" height="164" style="width:100%; height:100%;"></canvas>
+          </div>
+        </div>
+
+        <!-- ===== TOAST ===== -->
+        <sc-if value="{{ toastShow }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute; top:64px; left:50%; transform:translateX(-50%); padding:7px 16px; {{ S_PANEL }} animation:vgrise 2.4s ease forwards;">
+            <span style="font-family:'PublicPixel'; font-size:9px; color:#fff6d6;">{{ toastMsg }}</span>
+          </div>
+        </sc-if>
+
+        <!-- ===== BOTTOM PANEL ===== -->
+        <div style="position:absolute; bottom:10px; left:10px; right:10px; min-height:78px; padding:9px 10px; display:flex; align-items:stretch; gap:10px; {{ S_PANEL }}">
+          <span style="{{ rivetTL }}"></span><span style="{{ rivetTR }}"></span><span style="{{ rivetBL }}"></span><span style="{{ rivetBR }}"></span>
+
+          <!-- selection portrait -->
+          <div style="display:flex; align-items:center; gap:10px; width:206px; padding:6px 10px; {{ S_POD }}">
+            <div style="width:54px; height:54px; display:flex; align-items:center; justify-content:center; border-radius:3px; box-shadow:inset 2px 2px 0 var(--bevel-lo), inset -1px -1px 0 var(--bevel-hi); background:rgba(0,0,0,0.25);">
+              <canvas data-icon="{{ selPortrait }}" data-s="3" width="48" height="48" style="width:48px; height:48px;"></canvas>
+            </div>
+            <div style="flex:1; min-width:0;">
+              <div style="font-family:'PublicPixel'; font-size:10px; color:var(--ink); line-height:1.35;">{{ selName }}</div>
+              <div style="font-family:'PublicPixel'; font-size:8px; color:var(--dim); margin-top:4px;">{{ selHpText }}</div>
+              <div style="margin-top:5px; width:100%; height:7px; background:rgba(0,0,0,0.45); border-radius:2px; overflow:hidden;"><div style="height:100%; width:{{ selHpPct }}; background:linear-gradient(#7bd16b,#3f9a47);"></div></div>
+            </div>
+          </div>
+
+          <!-- separator -->
+          <div style="width:3px; align-self:stretch; background:linear-gradient(var(--bevel-lo),var(--bevel-hi)); border-radius:2px;"></div>
+
+          <!-- ACTION AREA -->
+          <div style="flex:1; display:flex; align-items:center;">
+
+            <!-- build menu (worker) -->
+            <sc-if value="{{ isWorker }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex; align-items:center; gap:8px; flex-wrap:nowrap; overflow-x:auto; width:100%; padding-bottom:2px;">
+                <sc-for list="{{ buildMenu }}" as="b" hint-placeholder-count="8">
+                  <button onClick="{{ b.onPick }}" style="{{ S_CARD }}">
+                    <canvas data-icon="{{ b.canvasId }}" data-s="2.3" width="37" height="37" style="width:37px; height:37px; margin:0 auto;"></canvas>
+                    <span style="font-family:'PublicPixel'; font-size:7.5px; color:var(--ink); display:block; margin-top:5px; white-space:nowrap;">{{ b.name }}</span>
+                    <div style="display:flex; gap:4px; justify-content:center; margin-top:5px;">
+                      <sc-for list="{{ b.costs }}" as="c" hint-placeholder-count="2">
+                        <span style="display:inline-flex; align-items:center; gap:2px; padding:1px 3px; background:rgba(0,0,0,0.3); border-radius:2px;"><canvas data-icon="{{ c.canvasId }}" data-s="0.85" width="14" height="14" style="width:14px; height:14px;"></canvas><span style="font-family:'PublicPixel'; font-size:7px; color:var(--dim);">{{ c.n }}</span></span>
+                      </sc-for>
+                    </div>
+                  </button>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <!-- train menu (cityhall/barracks/factory) -->
+            <sc-if value="{{ isTrainer }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex; align-items:center; gap:10px; width:100%;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <sc-for list="{{ trainList }}" as="b" hint-placeholder-count="3">
+                    <button onClick="{{ b.onPick }}" style="{{ S_CARD }}">
+                      <canvas data-icon="{{ b.canvasId }}" data-s="2.3" width="37" height="37" style="width:37px; height:37px; margin:0 auto;"></canvas>
+                      <span style="font-family:'PublicPixel'; font-size:7.5px; color:var(--ink); display:block; margin-top:5px; white-space:nowrap;">{{ b.name }}</span>
+                      <div style="display:flex; gap:4px; justify-content:center; margin-top:5px;">
+                        <sc-for list="{{ b.costs }}" as="c" hint-placeholder-count="2">
+                          <span style="display:inline-flex; align-items:center; gap:2px; padding:1px 3px; background:rgba(0,0,0,0.3); border-radius:2px;"><canvas data-icon="{{ c.canvasId }}" data-s="0.85" width="14" height="14" style="width:14px; height:14px;"></canvas><span style="font-family:'PublicPixel'; font-size:7px; color:var(--dim);">{{ c.n }}</span></span>
+                        </sc-for>
+                      </div>
+                    </button>
+                  </sc-for>
+                </div>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-family:'PublicPixel'; font-size:8px; color:var(--dim); margin-bottom:5px;">{{ queueLabel }}</div>
+                  <div style="display:flex; align-items:center; gap:7px;">
+                    <div style="flex:1; height:9px; background:rgba(0,0,0,0.45); border-radius:2px; overflow:hidden;"><div style="height:100%; width:{{ queuePct }}; background:linear-gradient(var(--accent),var(--accent2));"></div></div>
+                    <span style="font-family:'PublicPixel'; font-size:8px; color:var(--accent);">{{ queuePctText }}</span>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- combat unit stats (tank) -->
+            <sc-if value="{{ isCombat }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <sc-for list="{{ statChips }}" as="s" hint-placeholder-count="3">
+                  <div style="display:flex; flex-direction:column; align-items:center; gap:3px; padding:7px 12px; {{ S_POD }}">
+                    <span style="font-family:'PublicPixel'; font-size:7px; color:var(--dim); letter-spacing:1px;">{{ s.k }}</span>
+                    <span style="font-family:'PublicPixel'; font-size:13px; color:var(--ink);">{{ s.v }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+
+          </div>
+        </div>
+
+      </div>
+      <p style="margin:12px 4px 0; color:#6b7488; font-size:12.5px; line-height:1.5;">↑ Tıkla: <b style="color:#9aa3b5;">İşçi</b> → inşa menüsü · <b style="color:#9aa3b5;">Belediye/Kışla/Fabrika</b> → üretim · <b style="color:#9aa3b5;">Tank</b> → birim bilgisi · <b style="color:#9aa3b5;">Savaş rozeti</b> → barış→geri sayım→savaş.</p>
+    </section>
+
+    <!-- ===== SECTION 02 — OTHER SCREENS ===== -->
+    <section style="padding:34px 0 10px;">
+      <div style="display:flex; align-items:baseline; gap:14px; margin-bottom:16px;">
+        <span style="font-family:'PublicPixel'; font-size:9px; color:#6b7488;">02</span>
+        <h2 style="font-family:'PublicPixel'; font-size:15px; margin:0; color:#fff;">DİĞER EKRANLAR</h2>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:18px;">
+
+        <!-- main menu -->
+        <div>
+          <div style="font-family:'PublicPixel'; font-size:7px; color:#6b7488; letter-spacing:1px; margin-bottom:8px;">ANA MENÜ</div>
+          <div style="position:relative; aspect-ratio:4/3; border-radius:6px; overflow:hidden; background:#12281d; box-shadow:0 0 0 3px #0a0d12; display:flex; align-items:center; justify-content:center;">
+            <div style="position:absolute; inset:0; background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.04) 1px, transparent 0); background-size:14px 14px;"></div>
+            <div style="position:relative; width:78%; padding:22px 18px; text-align:center; {{ S_PANEL }}">
+              <span style="{{ rivetTL }}"></span><span style="{{ rivetTR }}"></span><span style="{{ rivetBL }}"></span><span style="{{ rivetBR }}"></span>
+              <div style="font-family:'PublicPixel'; font-size:15px; color:#f3d96a; text-shadow:2px 2px 0 #000; line-height:1.4;">MODERN<br/>CITY WAR</div>
+              <div style="font-family:'PublicPixel'; font-size:7px; color:var(--dim); margin-top:9px;">İki belediye başkanı, tek harita.</div>
+              <div style="display:flex; flex-direction:column; gap:8px; margin-top:18px;">
+                <div style="{{ S_BTN }} padding:10px;"><span style="font-family:'PublicPixel'; font-size:10px; color:var(--ink);">OYUN KUR</span></div>
+                <div style="{{ S_BTN }} padding:10px;"><span style="font-family:'PublicPixel'; font-size:10px; color:var(--ink);">OYUNA KATIL</span></div>
+                <div style="{{ S_BTN }} padding:10px;"><span style="font-family:'PublicPixel'; font-size:10px; color:var(--dim);">ÇIKIŞ</span></div>
+              </div>
+              <div style="font-family:'PublicPixel'; font-size:7px; color:var(--dim); opacity:0.6; margin-top:14px;">v0.1.0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- lobby host -->
+        <div>
+          <div style="font-family:'PublicPixel'; font-size:7px; color:#6b7488; letter-spacing:1px; margin-bottom:8px;">LOBİ · OYUN KUR</div>
+          <div style="position:relative; aspect-ratio:4/3; border-radius:6px; overflow:hidden; background:#12281d; box-shadow:0 0 0 3px #0a0d12; display:flex; align-items:center; justify-content:center;">
+            <div style="position:absolute; inset:0; background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.04) 1px, transparent 0); background-size:14px 14px;"></div>
+            <div style="position:relative; width:80%; padding:22px 18px; text-align:center; {{ S_PANEL }}">
+              <span style="{{ rivetTL }}"></span><span style="{{ rivetTR }}"></span><span style="{{ rivetBL }}"></span><span style="{{ rivetBR }}"></span>
+              <div style="font-family:'PublicPixel'; font-size:12px; color:#f3d96a; text-shadow:2px 2px 0 #000;">OYUN KUR</div>
+              <div style="font-family:'PublicPixel'; font-size:9px; color:var(--ink); margin-top:16px; animation:vgblink 1.4s infinite;">Rakip bekleniyor...</div>
+              <div style="margin-top:14px; padding:8px 10px; {{ S_POD }}">
+                <div style="font-family:'PublicPixel'; font-size:7px; color:var(--dim); line-height:1.6;">Arkadaşın bu IP'ye bağlanmalı:<br/><span style="color:var(--accent);">192.168.1.42</span> · port 8910</div>
+              </div>
+              <div style="{{ S_BTN }} padding:9px; margin-top:16px;"><span style="font-family:'PublicPixel'; font-size:9px; color:var(--dim);">GERİ</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- lobby join -->
+        <div>
+          <div style="font-family:'PublicPixel'; font-size:7px; color:#6b7488; letter-spacing:1px; margin-bottom:8px;">LOBİ · OYUNA KATIL</div>
+          <div style="position:relative; aspect-ratio:4/3; border-radius:6px; overflow:hidden; background:#12281d; box-shadow:0 0 0 3px #0a0d12; display:flex; align-items:center; justify-content:center;">
+            <div style="position:absolute; inset:0; background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.04) 1px, transparent 0); background-size:14px 14px;"></div>
+            <div style="position:relative; width:80%; padding:22px 18px; text-align:center; {{ S_PANEL }}">
+              <span style="{{ rivetTL }}"></span><span style="{{ rivetTR }}"></span><span style="{{ rivetBL }}"></span><span style="{{ rivetBR }}"></span>
+              <div style="font-family:'PublicPixel'; font-size:12px; color:#f3d96a; text-shadow:2px 2px 0 #000;">OYUNA KATIL</div>
+              <div style="font-family:'PublicPixel'; font-size:7px; color:var(--dim); margin-top:16px; text-align:left;">SUNUCU IP ADRESİ</div>
+              <div style="margin-top:6px; padding:10px 11px; text-align:left; {{ S_POD }}">
+                <span style="font-family:'PublicPixel'; font-size:10px; color:var(--ink);">127.0.0.1</span><span style="display:inline-block; width:2px; height:12px; background:var(--accent); margin-left:2px; vertical-align:middle; animation:vgblink 1s infinite;"></span>
+              </div>
+              <div style="{{ S_BTN }} padding:10px; margin-top:14px; background:var(--blue);"><span style="font-family:'PublicPixel'; font-size:10px; color:#fff;">BAĞLAN</span></div>
+              <div style="{{ S_BTN }} padding:9px; margin-top:8px;"><span style="font-family:'PublicPixel'; font-size:9px; color:var(--dim);">GERİ</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- victory -->
+        <div>
+          <div style="font-family:'PublicPixel'; font-size:7px; color:#6b7488; letter-spacing:1px; margin-bottom:8px;">ZAFER</div>
+          <div style="position:relative; aspect-ratio:4/3; border-radius:6px; overflow:hidden; background:#1a2516; box-shadow:0 0 0 3px #0a0d12; display:flex; align-items:center; justify-content:center;">
+            <div style="position:absolute; inset:0; background:rgba(0,0,0,0.5);"></div>
+            <div style="position:relative; width:80%; padding:26px 18px; text-align:center; {{ S_PANEL }}">
+              <span style="{{ rivetTL }}"></span><span style="{{ rivetTR }}"></span><span style="{{ rivetBL }}"></span><span style="{{ rivetBR }}"></span>
+              <canvas data-icon="ui:crown" data-s="3" width="48" height="48" style="width:48px; height:48px; margin:0 auto 10px;"></canvas>
+              <div style="font-family:'PublicPixel'; font-size:24px; color:#f3c64a; text-shadow:3px 3px 0 #000;">ZAFER!</div>
+              <div style="font-family:'PublicPixel'; font-size:8px; color:var(--dim); margin-top:12px;">Metropol hedefine ulaşıldı</div>
+              <div style="{{ S_BTN }} padding:11px; margin-top:18px;"><span style="font-family:'PublicPixel'; font-size:10px; color:var(--ink);">ANA MENÜ</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- defeat -->
+        <div>
+          <div style="font-family:'PublicPixel'; font-size:7px; color:#6b7488; letter-spacing:1px; margin-bottom:8px;">YENİLGİ</div>
+          <div style="position:relative; aspect-ratio:4/3; border-radius:6px; overflow:hidden; background:#251616; box-shadow:0 0 0 3px #0a0d12; display:flex; align-items:center; justify-content:center;">
+            <div style="position:absolute; inset:0; background:rgba(0,0,0,0.55);"></div>
+            <div style="position:relative; width:80%; padding:26px 18px; text-align:center; {{ S_PANEL }}">
+              <span style="{{ rivetTL }}"></span><span style="{{ rivetTR }}"></span><span style="{{ rivetBL }}"></span><span style="{{ rivetBR }}"></span>
+              <canvas data-icon="ui:skull" data-s="3" width="48" height="48" style="width:48px; height:48px; margin:0 auto 10px;"></canvas>
+              <div style="font-family:'PublicPixel'; font-size:24px; color:#e0564a; text-shadow:3px 3px 0 #000;">YENİLGİ</div>
+              <div style="font-family:'PublicPixel'; font-size:8px; color:var(--dim); margin-top:12px;">Belediye Binası yıkıldı</div>
+              <div style="{{ S_BTN }} padding:11px; margin-top:18px;"><span style="font-family:'PublicPixel'; font-size:10px; color:var(--ink);">ANA MENÜ</span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===== SECTION 03 — STYLE COMPARE ===== -->
+    <section style="padding:34px 0 20px;">
+      <div style="display:flex; align-items:baseline; gap:14px; margin-bottom:16px;">
+        <span style="font-family:'PublicPixel'; font-size:9px; color:#6b7488;">03</span>
+        <h2 style="font-family:'PublicPixel'; font-size:15px; margin:0; color:#fff;">STİL KARŞILAŞTIRMA</h2>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px;">
+        <div style="{{ woodVars }}">
+          <div style="font-family:'PublicPixel'; font-size:8px; color:#caa24a; letter-spacing:1px; margin-bottom:10px;">AHŞAP & TAŞ</div>
+          <div style="position:relative; padding:9px; display:flex; align-items:center; gap:8px; {{ S_PANEL }}">
+            <span style="{{ rivetTL }}"></span><span style="{{ rivetTR }}"></span><span style="{{ rivetBL }}"></span><span style="{{ rivetBR }}"></span>
+            <div style="display:flex; align-items:center; gap:5px; padding:4px 8px 4px 5px; {{ S_POD }}"><canvas data-icon="res:wood" data-s="1.4" width="22" height="22" style="width:22px;height:22px;"></canvas><span style="font-family:'PublicPixel'; font-size:10px; color:var(--ink);">100</span></div>
+            <div style="display:flex; align-items:center; gap:5px; padding:4px 8px 4px 5px; {{ S_POD }}"><canvas data-icon="res:stone" data-s="1.4" width="22" height="22" style="width:22px;height:22px;"></canvas><span style="font-family:'PublicPixel'; font-size:10px; color:var(--ink);">76</span></div>
+            <div style="flex:1;"></div>
+            <div style="{{ S_BTN }} padding:7px 11px;"><span style="font-family:'PublicPixel'; font-size:8px; color:#9be08a;">BARIŞ</span></div>
+          </div>
+        </div>
+        <div style="{{ steelVars }}">
+          <div style="font-family:'PublicPixel'; font-size:8px; color:#6fb6cf; letter-spacing:1px; margin-bottom:10px;">TAŞ & DEMİR</div>
+          <div style="position:relative; padding:9px; display:flex; align-items:center; gap:8px; {{ S_PANEL }}">
+            <span style="{{ rivetTL }}"></span><span style="{{ rivetTR }}"></span><span style="{{ rivetBL }}"></span><span style="{{ rivetBR }}"></span>
+            <div style="display:flex; align-items:center; gap:5px; padding:4px 8px 4px 5px; {{ S_POD }}"><canvas data-icon="res:wood" data-s="1.4" width="22" height="22" style="width:22px;height:22px;"></canvas><span style="font-family:'PublicPixel'; font-size:10px; color:var(--ink);">100</span></div>
+            <div style="display:flex; align-items:center; gap:5px; padding:4px 8px 4px 5px; {{ S_POD }}"><canvas data-icon="res:stone" data-s="1.4" width="22" height="22" style="width:22px;height:22px;"></canvas><span style="font-family:'PublicPixel'; font-size:10px; color:var(--ink);">76</span></div>
+            <div style="flex:1;"></div>
+            <div style="{{ S_BTN }} padding:7px 11px;"><span style="font-family:'PublicPixel'; font-size:8px; color:#9be08a;">BARIŞ</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { style:'wood', sel:'worker', war:'peace', warT:30, toast:'', toastN:0 };
+
+  B = { main:'#3a78d8', dark:'#27508f', light:'#7fb0ff', deep:'#173260' };
+  R = { main:'#dc4636', dark:'#9c2820', light:'#ff8473', deep:'#5e150f' };
+  SK='#f1b487'; SKD='#cd8a5b'; BOOT='#39323a'; STEEL='#5a6473'; STEELD='#3c4350';
+
+  // ---------- theme ----------
+  vars(style){
+    if(style==='steel') return "--ink:#e9eef6;--dim:#94a2b6;--panel:#2f3947;--panel2:#222a35;--bevel-hi:#566a7d;--bevel-lo:#141a22;--frame:#0c1016;--accent:#5ec8e6;--accent2:#3aa0c0;--rivet:#8298ac;--plankA:#323d4c;--plankB:#2b3540;--slot:#26303c;--blue:#3a78d8;--red:#dc4636;";
+    return "--ink:#f6ecd6;--dim:#c9a86e;--panel:#5a3f28;--panel2:#3f2c1b;--bevel-hi:#8a6440;--bevel-lo:#241608;--frame:#170d05;--accent:#f3c64a;--accent2:#d98a2b;--rivet:#caa24a;--plankA:#5e4229;--plankB:#523823;--slot:#46301d;--blue:#3a78d8;--red:#dc4636;";
+  }
+
+  renderVals(){
+    const st=this.state;
+    const rootStyle = this.vars(st.style) + " min-height:100vh; background:#0e1117; background-image:radial-gradient(circle at 1px 1px, rgba(255,255,255,0.03) 1px, transparent 0); background-size:24px 24px; color:#e9edf4; font-family:'DM Sans',system-ui,sans-serif; padding:0 0 70px;";
+
+    const S_PANEL = "border-radius:5px; background:repeating-linear-gradient(90deg, var(--plankA) 0 7px, var(--plankB) 7px 14px); box-shadow:inset 3px 3px 0 var(--bevel-hi), inset -3px -3px 0 var(--bevel-lo), 0 0 0 3px var(--frame), 0 5px 0 rgba(0,0,0,0.35);";
+    const S_POD = "background:var(--panel2); border-radius:3px; box-shadow:inset 2px 2px 0 var(--bevel-lo), inset -2px -2px 0 var(--bevel-hi);";
+    const S_BTN = "cursor:pointer; border:none; border-radius:3px; background:var(--slot); box-shadow:inset 2px 2px 0 var(--bevel-hi), inset -2px -2px 0 var(--bevel-lo), 0 0 0 2px var(--frame); text-align:center;";
+    const S_CARD = "flex:none; cursor:pointer; border:none; width:74px; padding:8px 6px; border-radius:3px; background:var(--slot); box-shadow:inset 2px 2px 0 var(--bevel-hi), inset -2px -2px 0 var(--bevel-lo), 0 0 0 2px var(--frame); text-align:center;";
+
+    const rv=(p)=>"position:absolute; width:5px; height:5px; border-radius:1px; background:var(--rivet); box-shadow:inset 1px 1px 0 rgba(255,255,255,0.45), inset -1px -1px 0 rgba(0,0,0,0.5); "+p+" z-index:3;";
+
+    const sbtn=(active)=>"font-family:'PublicPixel'; font-size:8px; letter-spacing:0.5px; cursor:pointer; padding:9px 12px; border-radius:7px; border:1px solid "+(active?'#caa24a':'#2a3140')+"; background:"+(active?'#3a2c14':'#171b24')+"; color:"+(active?'#f3c64a':'#7d8597')+";";
+
+    // selection
+    const sel=st.sel;
+    const SELDEF={
+      worker:{name:'İŞÇİ', hp:60, max:60, portrait:'unit:worker'},
+      cityhall:{name:'BELEDİYE BİNASI', hp:1500, max:1500, portrait:'bld:city_hall'},
+      barracks:{name:'KIŞLA', hp:600, max:600, portrait:'bld:barracks'},
+      factory:{name:'FABRİKA', hp:800, max:800, portrait:'bld:factory'},
+      tank:{name:'TANK', hp:450, max:450, portrait:'unit:tank'},
+    }[sel] || {name:'—', hp:0, max:1, portrait:'unit:worker'};
+
+    const cost=(arr)=>arr.map(c=>({canvasId:'res:'+c.r, n:c.n}));
+    const buildMenu=[
+      {id:'house',name:'EV',costs:[{r:'wood',n:50}]},
+      {id:'greenhouse',name:'SERA',costs:[{r:'wood',n:60}]},
+      {id:'bank',name:'BANKA',costs:[{r:'wood',n:80},{r:'stone',n:40}]},
+      {id:'sawmill',name:'KERESTECİ',costs:[{r:'wood',n:40},{r:'money',n:20}]},
+      {id:'quarry',name:'TAŞ OCAĞI',costs:[{r:'wood',n:60},{r:'money',n:20}]},
+      {id:'barracks',name:'KIŞLA',costs:[{r:'wood',n:100},{r:'stone',n:50}]},
+      {id:'factory',name:'FABRİKA',costs:[{r:'wood',n:120},{r:'stone',n:100}]},
+      {id:'turret',name:'TARET',costs:[{r:'stone',n:60},{r:'money',n:40}]},
+    ].map(b=>({...b, canvasId:'bld:'+b.id, costs:cost(b.costs), onPick:()=>this.toast(b.name+' — yerleştir (sol tık)')}));
+
+    const TRAIN={
+      cityhall:[{id:'worker',name:'İŞÇİ',costs:[{r:'food',n:30}]}],
+      barracks:[{id:'rifleman',name:'PİYADE',costs:[{r:'food',n:40},{r:'money',n:20}]},{id:'sniper',name:'NİŞANCI',costs:[{r:'food',n:50},{r:'money',n:50}]},{id:'rpg',name:"RPG'Cİ",costs:[{r:'food',n:60},{r:'money',n:60}]}],
+      factory:[{id:'tank',name:'TANK',costs:[{r:'money',n:150},{r:'stone',n:80}]}],
+    };
+    const trainList=(TRAIN[sel]||[]).map(b=>({...b, canvasId:'unit:'+b.id, costs:cost(b.costs), onPick:()=>this.toast(b.name+' üretim kuyruğuna eklendi')}));
+
+    const ordu=[
+      {id:'worker',name:'İŞÇİ',n:3},
+      {id:'rifleman',name:'PİYADE',n:2},
+      {id:'sniper',name:'NİŞANCI',n:1},
+      {id:'tank',name:'TANK',n:1},
+    ].map(u=>({...u, canvasId:'unit:'+u.id, countText:'×'+u.n, onPick:()=>this.setSel(u.id==='rifleman'||u.id==='sniper'?'tank':u.id)}));
+
+    // war
+    let warLabel, warColor, warBg, warExtra='';
+    if(st.war==='peace'){ warLabel='SAVAŞ İLAN ET'; warColor='#9be08a'; warBg='var(--slot)'; }
+    else if(st.war==='countdown'){ warLabel='SAVAŞA '+Math.ceil(st.warT)+' sn'; warColor='#f3c64a'; warBg='#4a3a12'; }
+    else { warLabel='SAVAŞ HALİ'; warColor='#ff6a55'; warBg='#4a1410'; warExtra='animation:vgpulse 0.9s infinite;'; }
+    const warBtnStyle="cursor:pointer; border:none; border-radius:4px; padding:9px 14px; font-family:'PublicPixel'; font-size:9px; letter-spacing:0.5px; color:"+warColor+"; background:"+warBg+"; box-shadow:inset 2px 2px 0 var(--bevel-hi), inset -2px -2px 0 var(--bevel-lo), 0 0 0 2px var(--frame); "+warExtra;
+
+    // pop/metro
+    const popUsed=9, popCap=12, metroPop=9, metroPopMax=40, metroBina=6, metroBinaMax=9;
+    const binaDots=Array.from({length:metroBinaMax},(_,i)=>({col: i<metroBina? 'var(--accent)':'rgba(0,0,0,0.45)'}));
+
+    const tokWrap="position:absolute; transform:translate(-50%,-50%); display:flex; align-items:center; justify-content:center;";
+    const ring=(on)=>"position:absolute; width:130%; height:130%; left:-15%; top:-15%; border-radius:50%; box-shadow:0 0 0 2px "+(on?'#fff':'transparent')+", 0 0 8px "+(on?'rgba(255,255,255,0.7)':'transparent')+"; pointer-events:none;";
+
+    return {
+      setRoot:(el)=>{ this.rootEl=el; },
+      rootStyle, S_PANEL, S_POD, S_BTN, S_CARD,
+      rivetTL:rv("top:5px; left:5px;"), rivetTR:rv("top:5px; right:5px;"), rivetBL:rv("bottom:5px; left:5px;"), rivetBR:rv("bottom:5px; right:5px;"),
+      styleWood:()=>this.setState({style:'wood'}), styleSteel:()=>this.setState({style:'steel'}),
+      styleWoodBtn:sbtn(st.style==='wood'), styleSteelBtn:sbtn(st.style==='steel'),
+      woodVars:this.vars('wood'), steelVars:this.vars('steel'),
+      tokWrap,
+      selCityhall:()=>this.setSel('cityhall'), selWorker:()=>this.setSel('worker'), selBarracks:()=>this.setSel('barracks'), selFactory:()=>this.setSel('factory'), selTank:()=>this.setSel('tank'),
+      selRingCityhall:ring(sel==='cityhall'), selRingWorker:ring(sel==='worker'), selRingBarracks:ring(sel==='barracks'), selRingFactory:ring(sel==='factory'), selRingTank:ring(sel==='tank'),
+      resources:[{canvasId:'res:wood',val:100},{canvasId:'res:stone',val:76},{canvasId:'res:food',val:50},{canvasId:'res:money',val:50}],
+      popText:popUsed+'/'+popCap, popPct:Math.round(popUsed/popCap*100)+'%',
+      metroPopText:metroPop+'/'+metroPopMax, metroPct:Math.round(metroPop/metroPopMax*100)+'%', binaDots,
+      armyPop:popUsed+'/'+popCap, ordu,
+      cycleWar:()=>this.cycleWar(), warLabel, warBtnStyle,
+      buildMenu, trainList,
+      isWorker:sel==='worker', isTrainer:(sel==='cityhall'||sel==='barracks'||sel==='factory'), isCombat:sel==='tank',
+      queueLabel: sel==='cityhall'?'KUYRUK: İŞÇI':(sel==='barracks'?'KUYRUK: PİYADE':'KUYRUK: TANK'),
+      queuePct: sel==='cityhall'?'40%':(sel==='barracks'?'65%':'25%'),
+      queuePctText: sel==='cityhall'?'40%':(sel==='barracks'?'65%':'25%'),
+      statChips:[{k:'HASAR',v:'24'},{k:'MENZİL',v:'4'},{k:'POP',v:'3'}],
+      selName:SELDEF.name, selHpText:Math.round(SELDEF.hp)+' / '+SELDEF.max, selHpPct:Math.round(SELDEF.hp/SELDEF.max*100)+'%', selPortrait:SELDEF.portrait,
+      toastShow: !!st.toast, toastMsg: st.toast,
+    };
+  }
+
+  setSel(id){ this.setState({sel:id}); }
+  toast(msg){ const n=this.state.toastN+1; this.setState({toast:msg, toastN:n}); setTimeout(()=>{ if(this.state.toastN===n) this.setState({toast:''}); }, 2300); }
+  cycleWar(){
+    if(this.state.war==='peace'){ this.setState({war:'countdown', warT:30}); this.toast('Savaş ilan edildi! 30 sn sonra çatışma serbest.'); }
+    else { this.setState({war:'peace'}); }
+  }
+
+  // ===================== PIXEL ENGINE =====================
+  p(c,x,y,w,h,col,S){ c.fillStyle=col; c.fillRect(Math.round(x*S),Math.round(y*S),Math.max(1,Math.ceil((w==null?1:w)*S)),Math.max(1,Math.ceil((h==null?1:h)*S))); }
+  disc(c,cx,cy,r,col,S){ const r2=r*r; for(let y=Math.floor(cy-r);y<=cy+r;y++){ for(let x=Math.floor(cx-r);x<=cx+r;x++){ const dx=x+0.5-cx,dy=y+0.5-cy; if(dx*dx+dy*dy<=r2) this.p(c,x,y,1,1,col,S);} } }
+  poly(c,pts,col,S){ c.fillStyle=col; c.beginPath(); pts.forEach((q,i)=>{ const x=q[0]*S,y=q[1]*S; i?c.lineTo(x,y):c.moveTo(x,y);}); c.closePath(); c.fill(); }
+
+  // ---- resources (16x16) ----
+  rWood(c,S){ this.disc(c,8,13,3,'rgba(0,0,0,0.18)',S);
+    this.p(c,2,6.5,12,3.4,'#8a5a32',S); this.p(c,2,6.5,12,0.8,'#a9763f',S);
+    this.p(c,3,10,12,3.3,'#7a4f2c',S); this.p(c,3,10,12,0.8,'#9a6a38',S);
+    this.disc(c,3.2,8.2,1.8,'#b9854a',S); this.disc(c,3.2,8.2,0.8,'#6e4528',S);
+    this.disc(c,4.2,11.6,1.7,'#a9763f',S); this.disc(c,4.2,11.6,0.7,'#5e3b22',S); }
+  rStone(c,S){ this.disc(c,8,12.6,3.4,'rgba(0,0,0,0.18)',S);
+    this.disc(c,6.4,9.2,3.1,'#9aa0a9',S); this.disc(c,10,10.6,2.6,'#868d97',S); this.disc(c,7,8,2.4,'#b3b9c1',S);
+    this.p(c,5,9.4,1,1,'#747983',S); this.p(c,6,6.6,1.3,1.3,'#cdd2d9',S); }
+  rFood(c,S){ this.disc(c,8,13,3,'rgba(0,0,0,0.16)',S);
+    this.disc(c,8,9.2,3.5,'#d8412f',S); this.disc(c,6.7,7.9,1.2,'#ff8a6a',S);
+    this.p(c,7.7,4.6,0.8,2.2,'#6e4528',S); this.poly(c,[[8.4,5.2],[10.4,4.6],[9.6,6.2]],'#4caf50',S); }
+  rMoney(c,S){ this.disc(c,8,13,3,'rgba(0,0,0,0.16)',S);
+    this.disc(c,8,8.8,3.7,'#caa024',S); this.disc(c,8,8.8,2.9,'#f3c64a',S);
+    this.p(c,7.6,6.3,0.8,5,'#8a6a16',S); this.p(c,6.5,6.9,2.7,0.7,'#8a6a16',S); this.p(c,6.5,8.5,2.7,0.7,'#8a6a16',S); this.p(c,6.5,10,2.7,0.7,'#8a6a16',S);
+    this.disc(c,6.6,7,0.8,'#fff0b0',S); }
+
+  // ---- ui glyphs ----
+  uiPop(c,S){ const fig=(x,col)=>{ this.disc(c,x,6.4,1.5,this.SK,S); this.poly(c,[[x-2,13.5],[x-1.6,8.8],[x+1.6,8.8],[x+2,13.5]],col,S); };
+    fig(6,this.B.main); fig(10.4,this.R.main); }
+  uiCrown(c,S){ this.disc(c,8,13.5,3.2,'rgba(0,0,0,0.2)',S);
+    this.poly(c,[[3,12],[3,5],[5.5,8],[8,4],[10.5,8],[13,5],[13,12]],'#f3c64a',S);
+    this.p(c,3,11.5,10,1.8,'#d99a1f',S);
+    this.disc(c,3,5,0.9,'#ff7aa0',S); this.disc(c,8,4,0.9,'#7fb0ff',S); this.disc(c,13,5,0.9,'#7be08a',S);
+    this.p(c,5,12,1,1,'#fff0b0',S); this.p(c,8.5,12,1,1,'#fff0b0',S); }
+  uiSkull(c,S){ this.disc(c,8,7.5,4,'#e9e4d6',S); this.p(c,4,7.5,8,4,'#e9e4d6',S);
+    this.p(c,5,11.5,6,1.4,'#e9e4d6',S);
+    this.disc(c,6.2,7.6,1.2,'#2b2230',S); this.disc(c,9.8,7.6,1.2,'#2b2230',S);
+    this.p(c,7.4,9.6,1.2,1.4,'#2b2230',S);
+    this.p(c,5.4,12.6,1,1.4,'#cfc9ba',S); this.p(c,7.5,12.6,1,1.4,'#cfc9ba',S); this.p(c,9.6,12.6,1,1.4,'#cfc9ba',S); }
+
+  // ---- buildings (16x16 mini) ----
+  bldHouse(c,S,T){ this.disc(c,8,14.5,5,'rgba(0,0,0,0.16)',S);
+    this.p(c,3.5,8.5,9,6,'#e7c594',S); this.p(c,3.5,8.5,9,0.7,'#f6d9ac',S); this.p(c,3.5,8.5,0.9,6,'#caa473',S);
+    for(let r=0;r<4;r++) this.p(c,2.4+r*0.9,8.5-r,11.2-1.8*r,1.1,r===0?T.dark:T.main,S);
+    this.p(c,2.4,8.0,11.2,0.6,T.light,S);
+    this.p(c,6.8,10.5,2.4,4,'#7a4a2a',S); this.p(c,4.4,9.8,1.8,1.8,'#ffd97a',S); this.p(c,10,9.8,1.8,1.8,'#ffd97a',S); }
+  bldGreen(c,S){ this.disc(c,8,14.5,5,'rgba(0,0,0,0.16)',S);
+    this.p(c,3.5,8.5,9,6,'#cfeef0',S); this.p(c,3.5,8.5,9,0.7,'#eafcff',S);
+    this.p(c,3.5,8.5,0.8,6,'#9fc7c2',S); this.p(c,12.2,8.5,0.8,6,'#9fc7c2',S); this.p(c,8,8.5,0.6,6,'#a9d2cd',S);
+    for(let r=0;r<3;r++) this.p(c,4.2+r*0.9,8.5-r,9.6-1.8*r,1,'#d9f4f5',S);
+    this.disc(c,6,12,1.1,'#52b95f',S); this.disc(c,10,12,1.1,'#52b95f',S); }
+  bldBank(c,S){ this.disc(c,8,14.5,5,'rgba(0,0,0,0.16)',S);
+    this.p(c,3.5,9,9,5.5,'#dfe3ea',S); this.p(c,3.5,9,9,0.7,'#f2f5fa',S);
+    for(let i=0;i<4;i++){ const x=4.3+i*2.1; this.p(c,x,10,1.1,4.4,'#eef1f6',S); this.p(c,x+0.8,10,0.4,4.4,'#c2c8d2',S);} 
+    for(let r=0;r<3;r++) this.p(c,4+r,8.8-r,8-2*r,0.9,'#cfd4dd',S);
+    this.disc(c,8,6.6,1.5,'#f3c64a',S); this.p(c,7.7,5.6,0.5,2,'#8a6a16',S); }
+  bldSaw(c,S,T){ this.disc(c,8,14.5,5,'rgba(0,0,0,0.16)',S);
+    this.disc(c,3.2,12.5,1,'#a9763f',S); this.disc(c,3.2,12.5,0.45,'#caa069',S);
+    this.p(c,4.5,8.8,7.5,5.7,'#a9763f',S); this.p(c,4.5,8.8,7.5,0.6,'#c08c52',S);
+    for(let r=0;r<4;r++) this.p(c,3.7+r*0.8,8.8-r,9-1.6*r,1,r===0?T.dark:T.main,S);
+    const a=this._t*7, cx=11, cy=11.5, Rr=2.4;
+    this.disc(c,cx,cy,Rr,'#c9ced6',S); this.disc(c,cx,cy,1,'#9aa0a9',S);
+    c.save(); c.translate(cx*S,cy*S); c.rotate(a); for(let k=0;k<8;k++){ const an=k*Math.PI/4; this.p(c,Math.cos(an)*Rr-0.3,Math.sin(an)*Rr-0.3,0.6,0.6,'#eef1f5',S);} c.restore(); }
+  bldQuarry(c,S,T){ this.disc(c,8,14.5,5,'rgba(0,0,0,0.16)',S);
+    this.p(c,2.6,11,11,3.5,'#8a6a44',S); this.p(c,2.6,11,11,0.6,'#a07e52',S);
+    this.p(c,3,9.5,4.5,1.8,'#9aa0a9',S); this.p(c,3,9.5,4.5,0.5,'#b3b9c1',S);
+    this.p(c,9.5,9,3,2.2,'#b3b9c1',S); this.p(c,9.5,9,3,0.5,'#cdd2d9',S);
+    this.p(c,5.4,4.5,0.9,7,'#8a5e30',S); this.p(c,8.4,4.5,0.9,7,'#8a5e30',S); this.p(c,5.4,4.5,3.9,0.9,'#7a4f28',S);
+    const bob=Math.sin(this._t*1.8)*0.8; this.p(c,6.6,4.8,0.3,3+bob,'#caa069',S); this.p(c,6,7.6+bob,1.6,1.6,'#b3b9c1',S); }
+  bldBarracks(c,S,T){ this.disc(c,8,14.5,5,'rgba(0,0,0,0.16)',S);
+    this.p(c,3.5,9,9,5.5,'#8a8466',S); this.p(c,3.5,9,9,0.7,'#a8a17e',S); this.p(c,3.5,9,0.9,5.5,'#6f6a50',S);
+    for(let r=0;r<4;r++) this.p(c,2.6+r*0.9,9-r,10.8-1.8*r,1.05,r===0?T.dark:T.main,S);
+    this.p(c,6.8,10.6,2.4,3.9,'#4a4636',S); this.disc(c,8,8.6,1.2,T.light,S); this.p(c,7.6,8.2,0.8,0.8,'#fff',S); }
+  bldFactory(c,S,T){ this.disc(c,8,14.5,5,'rgba(0,0,0,0.16)',S);
+    this.p(c,3,9,9.5,5.5,'#9aa0a8',S); this.p(c,3,9,9.5,0.7,'#b6bcc4',S); this.p(c,3,9,0.9,5.5,'#7d828c',S);
+    for(let i=0;i<3;i++){ const x=3.3+i*2.2; this.p(c,x,7.8,1.8,1.4,'#7d828c',S); this.p(c,x,7.8,1.8,0.5,T.main,S);} 
+    this.p(c,10.8,4,1.8,5.2,'#7d828c',S); this.p(c,10.6,3.7,2.2,0.7,'#5e636d',S); this.p(c,10.8,5.6,1.8,0.6,T.main,S);
+    for(let i=0;i<3;i++){ const ph=((this._t*0.6)+i*0.34)%1; this.disc(c,11.7+Math.sin(ph*4+i)*1,3.4-ph*4,0.6+ph*1.1,`rgba(120,124,132,${(1-ph)*0.5})`,S);} }
+  bldTurret(c,S,T){ this.disc(c,8,14.5,5,'rgba(0,0,0,0.16)',S);
+    this.p(c,4.5,10,7,4.5,'#b9bec7',S); this.p(c,4.5,10,7,0.7,'#d3d8df',S); this.p(c,4.5,12.4,7,2.1,T.dark,S); this.p(c,4.5,12.4,7,0.5,T.light,S);
+    const ang=Math.sin(this._t*1.3)*0.5, cx=8, cy=8.5; this.disc(c,cx,cy,2,'#5e636d',S); this.disc(c,cx,cy,1.2,T.main,S);
+    c.save(); c.translate(cx*S,cy*S); c.rotate(ang); this.p(c,0,-0.5,4.4,1.1,'#3c4350',S); c.restore(); }
+  bldCityHall(c,S,T){ this.disc(c,8,15,5.5,'rgba(0,0,0,0.18)',S);
+    this.p(c,2.5,8.5,11,6.5,'#e8e0cc',S); this.p(c,2.5,8.5,11,0.8,'#fff7e6',S); this.p(c,2.5,8.5,0.9,6.5,'#bcb39a',S); this.p(c,12.6,8.5,0.9,6.5,'#bcb39a',S);
+    for(let i=0;i<4;i++){ const x=3.4+i*2.4; this.p(c,x,9.6,1.4,5.4,'#f3ecd9',S); this.p(c,x+1.1,9.6,0.4,5.4,'#c9c0aa',S);} 
+    for(let r=0;r<3;r++) this.p(c,3.4+r,8.2-r,9.2-2*r,0.95,'#d8cfb8',S);
+    this.p(c,6.8,3,2.4,1.8,'#cdd3da',S); this.disc(c,8,3,1.3,'#dfe4ea',S); this.disc(c,8,3,0.6,T.main,S);
+    this.p(c,6.6,11,2.8,4,'#5b4a3a',S); this.p(c,7.2,10.4,1.6,3,T.main,S);
+    // flag
+    this.p(c,7.7,0.2,0.5,2.8,'#cfd6e2',S); for(let i=0;i<3;i++){ const fy=0.4+Math.sin(this._t*5-i*0.6)*0.3; this.p(c,8.2+i*0.7,fy,0.8,1.4,i%2?T.light:T.main,S);} }
+
+  // ---- units (16x16 mini portrait) ----
+  uHead(c,S,capCol,capStyle){ this.p(c,5.5,4.5,5,4.2,this.SK,S); this.p(c,5.5,4.5,1,4.2,this.SKD,S); this.p(c,8.4,6,0.8,0.8,'#2a2230',S);
+    if(capStyle==='hard'){ this.p(c,5,3.4,6,1.5,'#f5c542',S); this.p(c,5.7,2.6,3.6,1,'#f5c542',S); this.p(c,5,3.4,6,0.5,'#ffe07a',S);} 
+    else if(capStyle==='helmet'){ this.p(c,5,3.4,6,1.6,capCol,S); this.p(c,5.7,2.7,3.6,0.9,capCol,S); this.p(c,5,3.4,6,0.5,'#ffffff55',S);} 
+    else if(capStyle==='cap'){ this.p(c,5,3.6,6,1.3,'#3f5a2f',S); this.p(c,9.3,4,1.8,0.8,'#3f5a2f',S);} 
+    else if(capStyle==='band'){ this.p(c,5,3.7,6,1.2,'#34302e',S); this.p(c,5,3.7,6,0.4,capCol,S);} }
+  uBody(c,S,T){ this.p(c,4.8,8.5,6.4,5.5,T.main,S); this.p(c,4.8,8.5,1,5.5,T.deep,S); this.p(c,10.2,8.7,1,5.3,T.dark,S); this.p(c,4.8,11,6.4,0.8,T.light,S); this.disc(c,8,14.4,3,'rgba(0,0,0,0.16)',S); }
+  uWorker(c,S,T){ this.uBody(c,S,T); this.uHead(c,S,null,'hard'); this.p(c,10.6,9,2.4,1.2,this.SK,S); this.p(c,12,8,1,3.5,'#8a6a44',S); this.p(c,11.4,7.4,2.2,1.1,'#7d828c',S); }
+  uRifle(c,S,T){ this.uBody(c,S,T); this.uHead(c,S,T.dark,'helmet'); this.p(c,10.6,9.2,4,0.9,this.STEELD,S); this.p(c,10.4,8.8,1.5,1.6,'#43474f',S); }
+  uSniper(c,S,T){ this.uBody(c,S,T); this.uHead(c,S,null,'cap'); this.p(c,10.4,9.4,5.2,0.8,this.STEELD,S); this.p(c,11.4,8.4,1.2,0.7,'#23262d',S); }
+  uRpg(c,S,T){ this.uBody(c,S,T); this.uHead(c,S,T.main,'band'); this.p(c,9.2,7,5.4,1.5,'#3a4a2e',S); this.p(c,13.4,6.7,1.4,2.1,T.main,S); }
+  uTank(c,S,T){ this.disc(c,8,13.5,4.6,'rgba(0,0,0,0.18)',S);
+    this.p(c,2.5,11,11,2.4,'#2c2f36',S); for(let i=0;i<6;i++) this.p(c,3+i*1.8,11.4,0.7,1.5,'#15171c',S);
+    this.p(c,3.2,7.8,9.6,3.3,T.main,S); this.p(c,3.2,7.8,9.6,0.8,T.light,S); this.p(c,3.2,10,9.6,1,T.deep,S);
+    this.p(c,5.4,5.4,4.4,2.8,T.dark,S); this.p(c,5.4,5.4,4.4,0.7,T.light,S); this.disc(c,7.4,6.7,1.4,T.main,S);
+    this.p(c,9.4,6,4.8,1.1,'#3c4350',S); this.p(c,9.4,6,4.8,0.4,'#576070',S); }
+
+  // ---- scene bits ----
+  scTree(c,S){ const sw=Math.sin(this._t*1.6)*0.6; this.disc(c,8,13,3.2,'rgba(0,0,0,0.16)',S);
+    this.p(c,7.4,9,1.4,4,'#6e4a2a',S); this.disc(c,8+sw,7,4,'#2f8a3e',S); this.disc(c,8+sw,6.2,3,'#46a851',S); this.disc(c,6.8+sw,5.4,1.2,'#62c46c',S); }
+  scMini(c,S,w,h){ // minimap: w,h in logical (here canvas is 134x82 -> S=2 => logical 67x41)
+    const W=c.canvas.width/S, H=c.canvas.height/S;
+    this.p(c,0,0,W,H,'#5fb84f',S);
+    for(let i=0;i<40;i++){ const x=(i*53.7%W), y=((i*97.3)%H); this.p(c,x,y,1,1,'#54a945',S); }
+    this.disc(c,W*0.5,H*0.48,Math.min(W,H)*0.28,'#2f7fcf',S);
+    this.disc(c,W*0.22,H*0.5,1.6,'#3a78d8',S); this.disc(c,W*0.78,H*0.5,1.6,'#dc4636',S);
+    // viewport rect
+    c.strokeStyle='rgba(255,255,255,0.85)'; c.lineWidth=1; c.strokeRect(Math.round(W*0.12*S),Math.round(H*0.3*S),Math.round(W*0.4*S),Math.round(H*0.4*S)); }
+
+  drawIcon(c,S,type,id){
+    const T=this.B;
+    if(type==='res'){ ({wood:()=>this.rWood(c,S),stone:()=>this.rStone(c,S),food:()=>this.rFood(c,S),money:()=>this.rMoney(c,S)})[id]?.(); }
+    else if(type==='ui'){ ({pop:()=>this.uiPop(c,S),crown:()=>this.uiCrown(c,S),skull:()=>this.uiSkull(c,S)})[id]?.(); }
+    else if(type==='unit'){ ({worker:()=>this.uWorker(c,S,T),rifleman:()=>this.uRifle(c,S,T),sniper:()=>this.uSniper(c,S,T),rpg:()=>this.uRpg(c,S,T),tank:()=>this.uTank(c,S,T)})[id]?.(); }
+    else if(type==='bld'){
+      const red=id.endsWith('_red'); const TT=red?this.R:this.B; const bid=id.replace('_red','');
+      ({city_hall:()=>this.bldCityHall(c,S,TT),house:()=>this.bldHouse(c,S,TT),greenhouse:()=>this.bldGreen(c,S),bank:()=>this.bldBank(c,S),sawmill:()=>this.bldSaw(c,S,TT),quarry:()=>this.bldQuarry(c,S,TT),barracks:()=>this.bldBarracks(c,S,TT),factory:()=>this.bldFactory(c,S,TT),turret:()=>this.bldTurret(c,S,TT)})[bid]?.();
+    }
+  }
+
+  draw(){
+    const root=this.rootEl; if(!root) return;
+    root.querySelectorAll('canvas[data-icon]').forEach(cv=>{
+      const spec=cv.dataset.icon; if(!spec) return; const [type,id]=spec.split(':');
+      const ctx=cv.getContext('2d'); ctx.imageSmoothingEnabled=false; ctx.clearRect(0,0,cv.width,cv.height);
+      const S=parseFloat(cv.dataset.s)||1.5;
+      try{ this.drawIcon(ctx,S,type,id); }catch(e){}
+    });
+    root.querySelectorAll('canvas[data-scene]').forEach(cv=>{
+      const kind=cv.dataset.scene; const ctx=cv.getContext('2d'); ctx.imageSmoothingEnabled=false; ctx.clearRect(0,0,cv.width,cv.height);
+      const S=parseFloat(cv.dataset.s)||2;
+      try{ if(kind==='tree') this.scTree(ctx,S); else if(kind==='minimap') this.scMini(ctx,S); }catch(e){}
+    });
+  }
+
+  componentDidMount(){ this._t=0; this.draw();
+    this._timer=setInterval(()=>{ this._t+=0.06;
+      if(this.state.war==='countdown'){ const nt=this.state.warT-0.06; if(nt<=0){ this.setState({war:'war',warT:0}); this.toast('SAVAŞ BAŞLADI!'); } else this.setState({warT:nt}); }
+      this.draw();
+    }, 60);
+  }
+  componentDidUpdate(){ this.draw(); }
+  componentWillUnmount(){ if(this._timer) clearInterval(this._timer); }
+}
+</script>
+</body>
+</html>

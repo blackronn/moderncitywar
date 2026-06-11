@@ -27,38 +27,47 @@ func _build_ui() -> void:
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
-	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	center.add_child(box)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 14)
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	center.add_child(col)
 
-	# amblem (kalkan) + wordmark (VOXGARD)
+	# amblem panel DISINDA, basligin tepesinde
 	var emblem := TextureRect.new()
 	emblem.texture = load("res://assets/ui/voxgard-emblem.png")
 	emblem.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	emblem.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	emblem.custom_minimum_size = Vector2(190, 190)
-	box.add_child(emblem)
+	emblem.custom_minimum_size = Vector2(170, 170)
+	emblem.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	col.add_child(emblem)
+
+	# celik panel (percinli) icinde wordmark + butonlar
+	var panel := PanelContainer.new()
+	UiKit.panel(panel, 0.0, 16.0)
+	col.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	panel.add_child(box)
 
 	var wordmark := TextureRect.new()
 	wordmark.texture = load("res://assets/ui/voxgard-wordmark.png")
 	wordmark.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	wordmark.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	wordmark.custom_minimum_size = Vector2(380, 76)
+	wordmark.custom_minimum_size = Vector2(330, 64)
 	box.add_child(wordmark)
 
 	var sub := Label.new()
 	sub.text = Tr.t(&"subtitle")
-	UiKit.label(sub, 8, UiKit.TEXT_DIM)
+	UiKit.label(sub, 7, UiKit.TEXT_DIM)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(sub)
 
-	box.add_child(_spacer(16.0))
+	box.add_child(_spacer(8.0))
 	box.add_child(_menu_button(Tr.t(&"host_game"), _on_host, UiKit.ACCENT_BLUE))
 	box.add_child(_menu_button(Tr.t(&"join_game"), _on_join, Color.TRANSPARENT))
 	box.add_child(_menu_button(Tr.t(&"single_player"), _on_single, Color.TRANSPARENT))
 	box.add_child(_menu_button(Tr.t(&"quit"), _on_quit, Color.TRANSPARENT))
-	box.add_child(_spacer(8.0))
 
 	status = Label.new()
 	UiKit.label(status, 8, Color(1.0, 0.6, 0.5))
@@ -67,7 +76,7 @@ func _build_ui() -> void:
 
 	var ver := Label.new()
 	ver.text = "v" + D.VERSION
-	UiKit.label(ver, 8, Color(1, 1, 1, 0.3))
+	UiKit.label(ver, 7, Color(1, 1, 1, 0.3))
 	ver.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(ver)
 

@@ -30,10 +30,12 @@ var _oy := 0.0
 func _initialize() -> void:
 	var root := ProjectSettings.globalize_path("res://")
 	DirAccess.make_dir_recursive_absolute(root + "assets/generated/bible")
+	DirAccess.make_dir_recursive_absolute(root + "assets/generated/ui")
 	_bake_units(root)
 	_bake_buildings(root)
 	_bake_tiles(root)
 	_bake_fx(root)
+	_bake_ui(root)
 	print("GEN_BIBLE_OK")
 	quit(0)
 
@@ -1005,6 +1007,187 @@ func bake_fx_frame(id: StringName, t: float) -> Image:
 			p(cx - 1.5 - dp * 2.0, cy + 0.5, 0.8, 0.8, rgba(120, 104, 80, da))
 			p(cx + 1.0 + dp * 2.0, cy + 0.2, 0.8, 0.8, rgba(120, 104, 80, da))
 	return frame
+
+
+# ======================= TAS & DEMIR HUD (HUD Redesign.dc.html portu) =======================
+# Celik tema paleti (tasarimin --steel degiskenleri birebir)
+const UI_PANEL := "#2f3947"
+const UI_PANEL2 := "#222a35"
+const UI_BEVEL_HI := "#566a7d"
+const UI_BEVEL_LO := "#141a22"
+const UI_FRAME := "#0c1016"
+const UI_RIVET := "#8298ac"
+const UI_PLANK_A := "#323d4c"
+const UI_PLANK_B := "#2b3540"
+const UI_SLOT := "#26303c"
+
+
+func _poly(pts: Array, c: Color) -> void:
+	## Kucuk cokgen doldurma (taç/kafatasi/yaprak icin): even-odd testi.
+	var minx := 999.0
+	var miny := 999.0
+	var maxx := -999.0
+	var maxy := -999.0
+	for q: Vector2 in pts:
+		minx = minf(minx, q.x)
+		miny = minf(miny, q.y)
+		maxx = maxf(maxx, q.x)
+		maxy = maxf(maxy, q.y)
+	for y in range(floori(miny), ceili(maxy) + 1):
+		for x in range(floori(minx), ceili(maxx) + 1):
+			var pt := Vector2(x + 0.5, y + 0.5)
+			var inside := false
+			var j := pts.size() - 1
+			for i in pts.size():
+				var a: Vector2 = pts[i]
+				var b: Vector2 = pts[j]
+				if (a.y > pt.y) != (b.y > pt.y) \
+						and pt.x < (b.x - a.x) * (pt.y - a.y) / (b.y - a.y) + a.x:
+					inside = not inside
+				j = i
+			if inside:
+				p(x, y, 1, 1, c)
+
+
+func _bake_box_panel() -> Image:
+	## Ana panel (48x48, 9-patch margin 12): celik kalas seritleri + bevel +
+	## dis cerceve + kose percinleri. Yatay/dikey TILE ile desensiz uzar.
+	var img := blank(48, 48)
+	_img = img
+	_S = 1.0
+	_ox = 0.0
+	_oy = 0.0
+	# kalas seritleri (dikey, 7px)
+	for x in range(0, 48):
+		var c := col(UI_PLANK_A) if (x % 14) < 7 else col(UI_PLANK_B)
+		p(x, 0, 1, 48, c)
+	# bevel (ic kenarlar)
+	p(3, 3, 42, 3, col(UI_BEVEL_HI))
+	p(3, 3, 3, 42, col(UI_BEVEL_HI))
+	p(3, 42, 42, 3, col(UI_BEVEL_LO))
+	p(42, 3, 3, 42, col(UI_BEVEL_LO))
+	# dis cerceve
+	p(0, 0, 48, 3, col(UI_FRAME))
+	p(0, 45, 48, 3, col(UI_FRAME))
+	p(0, 0, 3, 48, col(UI_FRAME))
+	p(45, 0, 3, 48, col(UI_FRAME))
+	# percinler
+	for corner: Vector2i in [Vector2i(7, 7), Vector2i(36, 7), Vector2i(7, 36), Vector2i(36, 36)]:
+		p(corner.x, corner.y, 5, 5, col(UI_RIVET))
+		p(corner.x, corner.y, 2, 2, rgba(255, 255, 255, 0.45))
+		p(corner.x + 3, corner.y + 3, 2, 2, rgba(0, 0, 0, 0.5))
+	return img
+
+
+func _bake_box_pod() -> Image:
+	## Cokuk pod (24x24, margin 6): panel2 zemin + TERS bevel (icine gomulu).
+	var img := blank(24, 24)
+	_img = img
+	p(0, 0, 24, 24, col(UI_PANEL2))
+	p(0, 0, 24, 2, col(UI_BEVEL_LO))
+	p(0, 0, 2, 24, col(UI_BEVEL_LO))
+	p(0, 22, 24, 2, col(UI_BEVEL_HI))
+	p(22, 0, 2, 24, col(UI_BEVEL_HI))
+	return img
+
+
+func _bake_box_btn(fill: String, hi: String, lo: String, invert := false) -> Image:
+	## Buton/slot (24x24, margin 8): dolgu + bevel + 2px cerceve.
+	var img := blank(24, 24)
+	_img = img
+	p(0, 0, 24, 24, col(UI_FRAME))
+	p(2, 2, 20, 20, col(fill))
+	var top := col(lo) if invert else col(hi)
+	var bot := col(hi) if invert else col(lo)
+	p(2, 2, 20, 2, top)
+	p(2, 2, 2, 20, top)
+	p(2, 20, 20, 2, bot)
+	p(20, 2, 2, 20, bot)
+	return img
+
+
+func bake_ui_icon(id: StringName) -> Image:
+	## Tasarimin 16px kaynak/UI ikonlari (rWood/rStone/rFood/rMoney/uiPop/
+	## uiCrown/uiSkull birebir).
+	var img := blank(16, 16)
+	_img = img
+	_S = 1.0
+	_ox = 0.0
+	_oy = 0.0
+	match id:
+		&"wood":
+			disc(8, 13, 3, rgba(0, 0, 0, 0.18))
+			p(2, 6.5, 12, 3.4, col("#8a5a32"))
+			p(2, 6.5, 12, 0.8, col("#a9763f"))
+			p(3, 10, 12, 3.3, col("#7a4f2c"))
+			p(3, 10, 12, 0.8, col("#9a6a38"))
+			disc(3.2, 8.2, 1.8, col("#b9854a"))
+			disc(3.2, 8.2, 0.8, col("#6e4528"))
+			disc(4.2, 11.6, 1.7, col("#a9763f"))
+			disc(4.2, 11.6, 0.7, col("#5e3b22"))
+		&"stone":
+			disc(8, 12.6, 3.4, rgba(0, 0, 0, 0.18))
+			disc(6.4, 9.2, 3.1, col("#9aa0a9"))
+			disc(10, 10.6, 2.6, col("#868d97"))
+			disc(7, 8, 2.4, col("#b3b9c1"))
+			p(5, 9.4, 1, 1, col("#747983"))
+			p(6, 6.6, 1.3, 1.3, col("#cdd2d9"))
+		&"food":
+			disc(8, 13, 3, rgba(0, 0, 0, 0.16))
+			disc(8, 9.2, 3.5, col("#d8412f"))
+			disc(6.7, 7.9, 1.2, col("#ff8a6a"))
+			p(7.7, 4.6, 0.8, 2.2, col("#6e4528"))
+			_poly([Vector2(8.4, 5.2), Vector2(10.4, 4.6), Vector2(9.6, 6.2)], col("#4caf50"))
+		&"money":
+			disc(8, 13, 3, rgba(0, 0, 0, 0.16))
+			disc(8, 8.8, 3.7, col("#caa024"))
+			disc(8, 8.8, 2.9, col("#f3c64a"))
+			p(7.6, 6.3, 0.8, 5, col("#8a6a16"))
+			p(6.5, 6.9, 2.7, 0.7, col("#8a6a16"))
+			p(6.5, 8.5, 2.7, 0.7, col("#8a6a16"))
+			p(6.5, 10, 2.7, 0.7, col("#8a6a16"))
+			disc(6.6, 7, 0.8, col("#fff0b0"))
+		&"pop":
+			for fig: Array in [[6.0, TEAM[1]["main"]], [10.4, TEAM[2]["main"]]]:
+				var x: float = fig[0]
+				disc(x, 6.4, 1.5, col(SK))
+				_poly([Vector2(x - 2, 13.5), Vector2(x - 1.6, 8.8),
+					Vector2(x + 1.6, 8.8), Vector2(x + 2, 13.5)], col(fig[1]))
+		&"crown":
+			disc(8, 13.5, 3.2, rgba(0, 0, 0, 0.2))
+			_poly([Vector2(3, 12), Vector2(3, 5), Vector2(5.5, 8), Vector2(8, 4),
+				Vector2(10.5, 8), Vector2(13, 5), Vector2(13, 12)], col("#f3c64a"))
+			p(3, 11.5, 10, 1.8, col("#d99a1f"))
+			disc(3, 5, 0.9, col("#ff7aa0"))
+			disc(8, 4, 0.9, col("#7fb0ff"))
+			disc(13, 5, 0.9, col("#7be08a"))
+			p(5, 12, 1, 1, col("#fff0b0"))
+			p(8.5, 12, 1, 1, col("#fff0b0"))
+		&"skull":
+			disc(8, 7.5, 4, col("#e9e4d6"))
+			p(4, 7.5, 8, 4, col("#e9e4d6"))
+			p(5, 11.5, 6, 1.4, col("#e9e4d6"))
+			disc(6.2, 7.6, 1.2, col("#2b2230"))
+			disc(9.8, 7.6, 1.2, col("#2b2230"))
+			p(7.4, 9.6, 1.2, 1.4, col("#2b2230"))
+			p(5.4, 12.6, 1, 1.4, col("#cfc9ba"))
+			p(7.5, 12.6, 1, 1.4, col("#cfc9ba"))
+			p(9.6, 12.6, 1, 1.4, col("#cfc9ba"))
+	return img
+
+
+func _bake_ui(root: String) -> void:
+	var dir := root + "assets/generated/ui/"
+	_bake_box_panel().save_png(dir + "box_panel.png")
+	_bake_box_pod().save_png(dir + "box_pod.png")
+	_bake_box_btn(UI_SLOT, UI_BEVEL_HI, UI_BEVEL_LO).save_png(dir + "box_btn.png")
+	_bake_box_btn("#2c3744", "#6e8499", UI_BEVEL_LO).save_png(dir + "box_btn_hover.png")
+	_bake_box_btn("#222b36", UI_BEVEL_HI, UI_BEVEL_LO, true).save_png(dir + "box_btn_pressed.png")
+	_bake_box_btn("#3a78d8", "#7fb0ff", "#27508f").save_png(dir + "box_btn_blue.png")
+	_bake_box_btn("#4a3a12", "#8a6f2a", "#241c08").save_png(dir + "box_btn_amber.png")
+	_bake_box_btn("#4a1410", "#8a3a2a", "#240a06").save_png(dir + "box_btn_red.png")
+	for icon: StringName in [&"wood", &"stone", &"food", &"money", &"pop", &"crown", &"skull"]:
+		bake_ui_icon(icon).save_png(dir + "icon_%s.png" % icon)
 
 
 func _bake_fx(root: String) -> void:
