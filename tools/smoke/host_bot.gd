@@ -17,12 +17,15 @@ var _finished := false
 var _started := false
 var _ffa_seq := false
 var _elims := 0
+var _clients := 0   # 0 = senaryo varsayilani
 
 
 func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--scenario="):
 			scenario = arg.get_slice("=", 1)
+		elif arg.begins_with("--clients="):
+			_clients = int(arg.get_slice("=", 1))
 	get_tree().create_timer(TIMEOUT_S).timeout.connect(_fail)
 	Bus.game_over.connect(_on_over)
 	multiplayer.peer_connected.connect(_on_peer)
@@ -36,6 +39,8 @@ func _ready() -> void:
 
 
 func _need_clients() -> int:
+	if _clients > 0:
+		return _clients
 	return 3 if scenario == "ffa" else 1
 
 
@@ -78,7 +83,9 @@ func _on_war_ffa(state: int, _t: float) -> void:
 		return
 	_ffa_seq = true
 	await get_tree().create_timer(0.5).timeout
-	for victim in [3, 4, 2]:
+	for victim: int in [3, 4, 2]:
+		if victim > 1 + _need_clients():
+			continue   # 3 oyunculu macta P4 yok
 		if _finished:
 			return
 		_kill_hall(victim)
@@ -132,7 +139,7 @@ func _on_over(winner: int, reason: int) -> void:
 		"metro":
 			ok = winner == 1 and reason == D.Reason.METROPOLIS
 		"ffa":
-			ok = winner == 1 and reason == D.Reason.DESTRUCTION and _elims >= 3
+			ok = winner == 1 and reason == D.Reason.DESTRUCTION and _elims >= _need_clients()
 	if ok:
 		print("SMOKE_PASS_HOST")
 		# sv_game_over paketinin istemcilere ulasmasi icin cikmadan once bekle

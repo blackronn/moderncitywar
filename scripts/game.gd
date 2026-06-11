@@ -85,7 +85,9 @@ func _ready() -> void:
 	cam.position = Vector2(my_spawn) * D.TILE + Vector2(D.TILE, D.TILE)
 
 	pathing = Pathing.new()
-	pathing.setup(GameState.grid)
+	# oyuncu sayisi SART: 3-4 oyuncuda baris bolge grid'leri (astar_half[3/4])
+	# ancak boyle kurulur — eksikti ve P3/P4 hareket emrinde host cokuyordu
+	pathing.setup(GameState.grid, GameState.player_count)
 
 	var input_c: Node2D = InputScript.new()
 	input_c.name = "InputController"

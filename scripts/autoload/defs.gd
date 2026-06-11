@@ -4,7 +4,7 @@ extends Node
 ## preload edip dogrudan kullanir. Sim dosyalari da autoload yerine
 ## `const D := preload(...)` ile erisir.
 
-const VERSION := "0.6.0"
+const VERSION := "0.6.1"
 
 # --- oyuncular ---
 const MAX_PLAYERS := 4

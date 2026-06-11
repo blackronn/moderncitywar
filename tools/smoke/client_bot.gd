@@ -33,9 +33,21 @@ func _run() -> void:
 		"metro":
 			pass   # _on_over bekler
 		"ffa":
-			# 4 oyunculu FFA: P2 savas ilan eder, P3/P4 izler; host yikar
+			# REGRESYON: her istemci BARISTA iscisini yurutur — coklu oyuncuda
+			# baris bolge grid'i (astar_half[3/4]) eksikse host burada coker
+			var worker: Node = null
+			for e in GameState.entities.values():
+				if e.owner_pid == GameState.my_pid and e.def_id == &"worker":
+					worker = e
+					break
+			if worker != null:
+				var center := Vector2(D.MAP_W, D.MAP_H) * D.TILE / 2.0
+				var tgt: Vector2 = worker.position + (center - worker.position).normalized() * 48.0
+				Net.send_move(PackedInt32Array([worker.id]), tgt)
+				print("BOT_CLIENT P%d baris hareketi gonderildi" % GameState.my_pid)
+			# P2 savas ilan eder (hareketler islensin diye kisa bekleme)
 			if GameState.my_pid == 2:
-				await get_tree().create_timer(1.0).timeout
+				await get_tree().create_timer(2.0).timeout
 				print("BOT_CLIENT P2 savas ilan ediyor")
 				Net.send_declare_war()
 
