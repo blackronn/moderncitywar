@@ -57,6 +57,38 @@ func _go() -> void:
 	# su varsa kopru gosterimi: TAMAMLANMIS kopru + ustunde duran asker
 	# (koprunun birimin ALTINDA cizildigini dogrular — GroundDecals katmani)
 	_demo_bridge(sim)
+	# --spread-test: 12 piyadeyi tek noktaya yuru emriyle gonder; spiral
+	# hedef dagitimi + ayrisma sayesinde IC ICE GIRMEDEN dizilmeliler
+	if arg_has(&"--spread-test"):
+		var ids := PackedInt32Array()
+		for i in 12:
+			var u2: Node = sim.spawn_unit(&"rifleman", 1,
+				sim.cell_center(tl + Vector2i(-4 + (i % 4), 6 + (i / 4))))
+			ids.append(u2.id)
+		sim.recount_pop()
+		var rally: Vector2 = sim.cell_center(tl + Vector2i(8, 8))
+		Net.send_move(ids, rally)
+		get_tree().current_scene.cam.position = rally
+		_spread_diag.call_deferred(ids, rally)
+
+
+func _spread_diag(ids: PackedInt32Array, rally: Vector2) -> void:
+	await get_tree().create_timer(3.0).timeout
+	var moved := 0
+	var cells := {}
+	for id in ids:
+		var e: Node = GameState.ent(id)
+		if e == null:
+			continue
+		if e.position.distance_to(rally) < 80.0:
+			moved += 1
+		cells[e.cell()] = cells.get(e.cell(), 0) + 1
+	var worst := 0
+	for c in cells:
+		worst = maxi(worst, cells[c])
+	print("SPREAD_DIAG yakin=", moved, "/", ids.size(), " ayni_hucre_max=", worst,
+		" ilk_task=", GameState.ent(ids[0]).task if GameState.ent(ids[0]) != null else "?")
+
 	# secim: varsayilan isci (insa menusu); --select=<birim> ile degisir
 	# (orn. --select=mortar -> menzil halkasi gorseli)
 	var want: StringName = &"worker"

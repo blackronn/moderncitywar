@@ -27,6 +27,7 @@ var ghost_sprite: Sprite2D
 var pathing = null               # Pathing (RefCounted)
 var _ghost_def: StringName
 var _screenshot_path := ""
+var _shot_delay := 0.8   # screenshot oncesi bekleme SANIYE (--shot-delay=N; fps'e bagimsiz)
 
 
 func _ready() -> void:
@@ -117,6 +118,8 @@ func _ready() -> void:
 			_screenshot_path = arg.get_slice("=", 1)
 			if _screenshot_path.is_relative_path():
 				_screenshot_path = ProjectSettings.globalize_path("res://") + _screenshot_path
+		elif arg.begins_with("--shot-delay="):
+			_shot_delay = maxf(0.2, float(arg.get_slice("=", 1)))
 		elif arg == "--end":
 			show_end = true   # son ekran onizlemesi (screenshot icin)
 
@@ -135,9 +138,10 @@ func _preview_end_overlay() -> void:
 
 
 func _take_screenshot() -> void:
-	# render + mac baslangici otursun
-	for _i in 45:
-		await get_tree().process_frame
+	# render + mac baslangici otursun (sure bazli: kare sayisi fps'e gore
+	# 60-800 arasi degisebiliyor, kare beklemek guvenilmez)
+	await get_tree().create_timer(_shot_delay).timeout
+	await get_tree().process_frame
 	var img := get_viewport().get_texture().get_image()
 	var err := img.save_png(_screenshot_path)
 	print("SCREENSHOT_SAVED " if err == OK else "SCREENSHOT_FAILED ", _screenshot_path)

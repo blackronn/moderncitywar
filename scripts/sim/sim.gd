@@ -124,8 +124,43 @@ func handle_move(pid: int, ids: PackedInt32Array, target: Vector2) -> void:
 	if GameState.eliminated.has(pid):
 		return
 	var cell := _clamp_half(pid, _px_to_cell(target), true)
-	for u in _owned_units(pid, ids):
-		_set_move(u, cell)
+	var units := _owned_units(pid, ids)
+	if units.size() <= 1:
+		for u in units:
+			_set_move(u, cell)
+		return
+	# GRUP EMRI: herkes ayni hucreye degil, merkez etrafina SPIRAL dagilir
+	# (ic ice girmenin ana kaynagi tek-hucre yigilmasiydi)
+	units.sort_custom(func(a, b):
+		return a.position.distance_squared_to(Vector2(cell) * D.TILE) \
+			< b.position.distance_squared_to(Vector2(cell) * D.TILE))
+	var cells := _spread_cells(cell, units.size(), pid)
+	for i in units.size():
+		_set_move(units[i], cells[i])
+
+
+func _spread_cells(center: Vector2i, n: int, pid: int) -> Array:
+	## Merkezden disa halka halka, yurunebilir + (baristaysa) bolge ici
+	## benzersiz hucreler. Yetmezse merkeze yigilir (nadir).
+	var out: Array = []
+	var r := 0
+	while out.size() < n and r <= 6:
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if maxi(absi(dx), absi(dy)) != r:
+					continue
+				var c := center + Vector2i(dx, dy)
+				if not pathing.in_bounds(c) or pathing.is_solid(c):
+					continue
+				if _at_peace() and not D.in_zone(pid, c, GameState.player_count):
+					continue
+				out.append(c)
+				if out.size() >= n:
+					return out
+		r += 1
+	while out.size() < n:
+		out.append(center)
+	return out
 
 
 func handle_gather(pid: int, ids: PackedInt32Array, cell: Vector2i) -> void:
@@ -929,35 +964,51 @@ func _broadcast_snapshot() -> void:
 
 
 func _separate_units() -> void:
-	## Ayni hucrede ust uste binen birimleri yumusakca iter (fizik yok).
+	## Ust uste binen birimleri iter (fizik yok). Ayni hucreyle sinirli degil:
+	## 3x3 komsu hucreler de taranir (hucre sinirindaki bindirme kaciyordu).
+	## Iki taraf da aktif yoldaysa itilmez (hareket titremesi guvenligi).
 	var buckets := {}
-	for u in _units():
+	var all := _units()
+	for u in all:
 		var c: Vector2i = u.cell()
 		if not buckets.has(c):
 			buckets[c] = []
 		buckets[c].append(u)
-	for c in buckets:
-		var arr: Array = buckets[c]
-		if arr.size() < 2:
-			continue
-		for i in arr.size():
-			for j in range(i + 1, arr.size()):
-				var a: Node = arr[i]
-				var b: Node = arr[j]
-				# aktif yol izleyenleri itme: hareketle bogusup titremesinler
-				var a_idle: bool = a.path_i >= a.path.size()
-				var b_idle: bool = b.path_i >= b.path.size()
-				if not a_idle and not b_idle:
-					continue
-				var dv: Vector2 = a.position - b.position
-				var dl := dv.length()
-				if dl >= 10.0:
-					continue
-				var push := dv.normalized() * 0.5 if dl > 0.01 else Vector2(0.5, 0.0)
-				if a_idle and not pathing.is_solid(_px_to_cell(a.position + push)):
-					a.position += push
-				if b_idle and not pathing.is_solid(_px_to_cell(b.position - push)):
-					b.position -= push
+	for a in all:
+		var ac: Vector2i = a.cell()
+		var a_idle: bool = a.path_i >= a.path.size()
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				for b in buckets.get(ac + Vector2i(dx, dy), []):
+					if b.id <= a.id:
+						continue   # her cift tek sefer
+					var b_idle: bool = b.path_i >= b.path.size()
+					if not a_idle and not b_idle:
+						continue
+					var dv: Vector2 = a.position - b.position
+					var dl := dv.length()
+					if dl >= 10.0:
+						continue
+					var push: Vector2
+					if dl > 0.01:
+						push = dv.normalized() * 0.9
+					else:
+						# tam ust uste: id'den deterministik yon
+						push = Vector2(0.9, 0.0).rotated(float((a.id * 97 + b.id * 31) % 628) * 0.01)
+					if a_idle and _push_ok(a, push):
+						a.position += push
+					if b_idle and _push_ok(b, -push):
+						b.position -= push
+
+
+func _push_ok(u: Node, push: Vector2) -> bool:
+	## Itme gecerli mi: solid hucreye ve (baristayken) bolge disina itme yok.
+	var c := _px_to_cell(u.position + push)
+	if pathing.is_solid(c):
+		return false
+	if _at_peace() and not D.in_zone(u.owner_pid, c, GameState.player_count):
+		return false
+	return true
 
 
 # === hareket / toplama ic mantigi ===
