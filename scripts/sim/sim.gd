@@ -47,6 +47,8 @@ func start_match() -> void:
 		var wc: Vector2i = pathing.nearest_free(tl + Vector2i(1, 2), 4)
 		if wc != Vector2i(-1, -1):
 			spawn_unit(&"worker", pid, cell_center(wc))
+		if Net.start_mode == 1:
+			_spawn_advanced_start(pid, tl)
 	recount_pop()
 	Net.ev(D.Ev.MATCH_STARTED)
 	# mac BARISTA baslar: sinirlar kapali, saldiri yok; "Savas Ilan Et" ->
@@ -54,6 +56,44 @@ func start_match() -> void:
 	for pid in GameState.player_ids():
 		Bus.resources_changed.emit(pid)   # host HUD'u da ilk degerleri gorsun
 		Net.bc_resources(pid)
+
+
+func _spawn_advanced_start(pid: int, tl: Vector2i) -> void:
+	## GELISMIS BASLANGIC: hazir kucuk kasaba + ek isciler + bonus kaynak.
+	## Offsetler harita merkezine dogru acilir (her oyuncuda simetrik);
+	## uygun olmayan hucre (su/kaya/dolu) sessizce atlanir.
+	var center := Vector2i(D.MAP_W / 2, D.MAP_H / 2)
+	var dir := Vector2i(1 if center.x >= tl.x else -1, 1 if center.y >= tl.y else -1)
+	for item: Array in D.ADV_KIT:
+		var bid: StringName = item[0]
+		var off: Vector2i = item[1]
+		var size: Vector2i = D.building(bid)["size"]
+		var cell := tl + Vector2i(off.x * dir.x, off.y * dir.y)
+		# yon eksiyse footprint sol-ustunu kaydir (kit hep merkez yonunde acilir)
+		if dir.x < 0:
+			cell.x -= size.x - 1
+		if dir.y < 0:
+			cell.y -= size.y - 1
+		if _kit_spot_ok(cell, size):
+			spawn_building(bid, pid, cell, true)
+	for i in D.ADV_WORKERS:
+		var wc: Vector2i = pathing.nearest_free(tl + Vector2i(dir.x * (2 + i), dir.y * 2), 5)
+		if wc != Vector2i(-1, -1):
+			spawn_unit(&"worker", pid, cell_center(wc))
+	for kind in D.ADV_RES:
+		GameState.res[pid][kind] += D.ADV_RES[kind]
+	_res_dirty = true
+
+
+func _kit_spot_ok(top_left: Vector2i, size: Vector2i) -> bool:
+	for dy in size.y:
+		for dx in size.x:
+			var c := top_left + Vector2i(dx, dy)
+			if not pathing.in_bounds(c) or pathing.is_solid(c):
+				return false
+			if not D.BUILDABLE_TILES.has(GameState.grid_at(c)):
+				return false
+	return true
 
 
 func _physics_process(delta: float) -> void:

@@ -67,6 +67,19 @@ func _build_ui() -> void:
 	box.add_child(_menu_button(Tr.t(&"host_game"), _on_host, UiKit.ACCENT_BLUE))
 	box.add_child(_menu_button(Tr.t(&"join_game"), _on_join, Color.TRANSPARENT))
 	box.add_child(_menu_button(Tr.t(&"single_player"), _on_single, Color.TRANSPARENT))
+
+	# gelismis baslangic anahtari: tek kisilik VE kurulan oyunlara uygulanir
+	# (host secer; hazir kasaba + ek isci + bonus kaynakla baslanir)
+	var adv := Button.new()
+	adv.toggle_mode = true
+	adv.button_pressed = Net.start_mode == 1
+	_style_adv(adv)
+	adv.custom_minimum_size = Vector2(320, 36)
+	adv.toggled.connect(func(on: bool):
+		Net.start_mode = 1 if on else 0
+		_style_adv(adv))
+	box.add_child(adv)
+
 	box.add_child(_menu_button(Tr.t(&"quit"), _on_quit, Color.TRANSPARENT))
 
 	status = Label.new()
@@ -79,6 +92,12 @@ func _build_ui() -> void:
 	UiKit.label(ver, 7, Color(1, 1, 1, 0.3))
 	ver.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(ver)
+
+
+func _style_adv(b: Button) -> void:
+	var on := b.button_pressed
+	b.text = "%s: %s" % [Tr.t(&"start_mode"), Tr.t(&"start_adv" if on else &"start_std")]
+	UiKit.button(b, 9, Color("#f3c64a") if on else Color.TRANSPARENT)
 
 
 func _menu_button(label: String, fn: Callable, accent: Color) -> Button:
@@ -158,6 +177,8 @@ func _handle_cli() -> void:
 			seed_override = int(arg.get_slice("=", 1))
 		elif arg.begins_with("--players="):
 			players_override = clampi(int(arg.get_slice("=", 1)), 2, D.MAX_PLAYERS)
+		elif arg == "--adv":
+			Net.start_mode = 1   # onizleme/test: gelismis baslangic
 	if smoke_host:
 		var bot: Node = load("res://tools/smoke/host_bot.gd").new()
 		get_tree().root.add_child.call_deferred(bot)

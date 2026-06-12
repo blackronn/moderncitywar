@@ -11,6 +11,7 @@ var status: Label
 var ip_edit: LineEdit
 var players_label: Label
 var start_btn: Button
+var mode_btn: Button
 var _vote_buttons := {}
 
 
@@ -80,6 +81,20 @@ func _ready() -> void:
 	players_label.text = Tr.t(&"players_in_lobby") % [1, 4]
 	box.add_child(players_label)
 
+	# baslangic modu: host degistirir, istemciler gorur
+	mode_btn = Button.new()
+	mode_btn.toggle_mode = mode == "host"
+	mode_btn.disabled = mode != "host"
+	mode_btn.button_pressed = Net.start_mode == 1
+	_style_mode()
+	mode_btn.custom_minimum_size = Vector2(300, 32)
+	if mode == "host":
+		mode_btn.toggled.connect(func(on: bool):
+			Net.start_mode = 1 if on else 0
+			_style_mode()
+			Net._broadcast_lobby())
+	box.add_child(mode_btn)
+
 	if mode == "host":
 		status.text = Tr.t(&"waiting_opponent")
 		var st_tw := create_tween().set_loops()
@@ -146,6 +161,14 @@ func _on_players(count: int, max_p: int) -> void:
 		start_btn.tooltip_text = Tr.t(&"need_two_players") if count < 2 else ""
 	if mode != "host":
 		status.text = Tr.t(&"waiting_host_start")
+		mode_btn.button_pressed = Net.start_mode == 1
+		_style_mode()
+
+
+func _style_mode() -> void:
+	var on := Net.start_mode == 1
+	mode_btn.text = "%s: %s" % [Tr.t(&"start_mode"), Tr.t(&"start_adv" if on else &"start_std")]
+	UiKit.button(mode_btn, 8, Color("#f3c64a") if on else Color.TRANSPARENT)
 
 
 func _local_ips() -> String:

@@ -18,6 +18,8 @@ var peer_votes := {}                 # host: pid -> harita oyu (-1 rastgele)
 var game_ready := false              # lokal game sahnesi sv_* almaya hazir mi
 var sim: Node = null                 # host'ta game.gd kaydeder (sim.gd)
 var my_map_vote := -1                # lobide secilen harita (-1 = rastgele)
+var start_mode := 0                  # 0 standart (1 isci), 1 GELISMIS (hazir kasaba)
+                                     # host-otoriter: sim host'ta kurar, protokol degismez
 var _buffer: Array = []              # game_ready oncesi gelen [metod, argv] cagrilari
 var _host_scene_ready := false
 var _ready_peers := {}               # host: pid -> map_hash dogrulandi
@@ -128,11 +130,12 @@ func _on_peer_disconnected(id: int) -> void:
 func _broadcast_lobby() -> void:
 	Bus.lobby_players.emit(player_total(), D.MAX_PLAYERS)
 	for pid in peers:
-		sv_lobby_state.rpc_id(peers[pid], player_total(), D.MAX_PLAYERS)
+		sv_lobby_state.rpc_id(peers[pid], player_total(), D.MAX_PLAYERS, start_mode)
 
 
 @rpc("authority", "call_remote", "reliable")
-func sv_lobby_state(count: int, max_p: int) -> void:
+func sv_lobby_state(count: int, max_p: int, mode := 0) -> void:
+	start_mode = mode   # istemci lobide gormek icin (otorite host'ta)
 	Bus.lobby_players.emit(count, max_p)
 
 

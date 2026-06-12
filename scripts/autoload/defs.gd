@@ -4,7 +4,18 @@ extends Node
 ## preload edip dogrudan kullanir. Sim dosyalari da autoload yerine
 ## `const D := preload(...)` ile erisir.
 
-const VERSION := "0.7.2"
+const VERSION := "0.7.3"
+
+# --- gelismis baslangic kiti (lobi/menu anahtari; host sim'i kurar) ---
+# offsetler belediye sol-ustune gore, eksen basina YON carpanli (harita
+# merkezine dogru acilir; her oyuncuda simetrik)
+const ADV_KIT: Array = [
+	[&"house", Vector2i(4, 0)], [&"house", Vector2i(4, 2)],
+	[&"greenhouse", Vector2i(4, 4)], [&"bank", Vector2i(6, 1)],
+	[&"barracks", Vector2i(0, 4)],
+]
+const ADV_WORKERS := 3
+const ADV_RES := {"wood": 150, "stone": 100, "food": 100, "money": 120}
 
 # --- oyuncular ---
 const MAX_PLAYERS := 4
