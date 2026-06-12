@@ -4,7 +4,7 @@ extends Node
 ## preload edip dogrudan kullanir. Sim dosyalari da autoload yerine
 ## `const D := preload(...)` ile erisir.
 
-const VERSION := "0.7.3"
+const VERSION := "0.8.0"
 
 # --- gelismis baslangic kiti (lobi/menu anahtari; host sim'i kurar) ---
 # offsetler belediye sol-ustune gore, eksen basina YON carpanli (harita
@@ -52,7 +52,8 @@ const GATHER_RETARGET_T := 6         # kaynak tukenince bu yaricapta yenisi aran
 const MAX_BUILDERS := 3              # ayni insaata en fazla isci
 const TRAIN_QUEUE_MAX := 5
 
-enum Tile { GRASS, WATER, BRIDGE, FOREST, STONE, GOLD, SNOW, HILL, MOUNTAIN }
+enum Tile { GRASS, WATER, BRIDGE, FOREST, STONE, GOLD, SNOW, HILL, MOUNTAIN, RAVINE }
+# RAVINE: vadi bogazi — gecilmez AMA kopru kurulabilir (su gibi)
 enum Klass { INFANTRY, ARMOR, BUILDING }
 enum War { PEACE, COUNTDOWN, WAR }
 enum MapType { RIVER, LAKE, PLAINS, SNOW, VALLEY }

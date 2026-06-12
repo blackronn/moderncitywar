@@ -529,8 +529,8 @@ func bake_building_frame(id: StringName, t: float, pid: int) -> Image:
 	_ox = 0.0
 	_oy = 0.0
 	if id == &"bridge_seg":
-		# kopru parcasi: tile boyutunda, altinda akan su + ahsap dosame
-		_t_water(t, 0)
+		# kopru parcasi: SEFFAF zemin + ahsap dosame — altindaki arazi
+		# (su VEYA vadi bogazi) terrain katmanindan gorunur
 		_t_bridge_top()
 		return frame
 	if id == &"mine":
@@ -805,24 +805,27 @@ func _b_mine(t: float, T: Dictionary) -> void:
 
 
 func _b_sandbags(t: float, T: Dictionary) -> void:
-	## Kum torbasi siperi (26px, alcak): iki sira torba + takim flamasi ucu.
-	disc(13, 18.0, 5.6, rgba(0, 0, 0, 0.14))
-	# alt sira (5 torba)
-	for i in 5:
-		var x := 6.0 + i * 3.0
-		disc(x, 16.6, 1.45, col("#b6a06a"))
-		disc(x - 0.3, 16.2, 1.0, col("#cdb67e"))
-		p(x - 1.2, 17.2, 2.4, 0.5, col("#8f7c4e"))
-	# ust sira (4 torba, saskin dizilim)
-	for i in 4:
-		var x := 7.5 + i * 3.0
-		disc(x, 14.4, 1.4, col("#c2ab72"))
-		disc(x - 0.3, 14.0, 0.95, col("#d8c28a"))
-		p(x - 1.1, 15.0, 2.2, 0.5, col("#94814f"))
-	# kucuk takim isareti (kazikta minik flama)
-	p(5.2, 11.6, 0.5, 3.4, col("#6b7280"))
-	var fy := 11.6 + sin(t * 5.0) * 0.3
-	p(5.7, fy, 1.8, 1.2, col(T["main"]))
+	## Asset Bible #3 KUM TORBASI (birebir): iki sira istiflenmis haki torba
+	## (alt 3 + ustte saskin 2) + yer golgesi; ustune minik takim flamasi.
+	## Tasarim 16px tile — 26px bina karesine +5 ofsetle ortalanir.
+	var ox := 5.0
+	var oy := 5.0
+	p(ox + 0.5, oy + 12, 15, 2, rgba(0, 0, 0, 0.16))   # yer golgesi
+	for bx_by: Vector2 in [
+		Vector2(0.4, 9.4), Vector2(5.5, 9.4), Vector2(10.6, 9.4),   # alt sira
+		Vector2(2.9, 6.1), Vector2(8.0, 6.1),                        # ust sira
+	]:
+		var x := ox + bx_by.x
+		var y := oy + bx_by.y
+		p(x, y, 5, 3.5, col("#b39a63"))
+		p(x, y, 5, 0.9, col("#cbb079"))
+		p(x, y + 2.7, 5, 0.8, col("#8f7847"))
+		p(x + 4.5, y, 0.55, 3.5, col("#7e683f"))
+		p(x + 0.7, y + 1.5, 3.3, 0.55, col("#a78f56"))
+	# takim isareti: kazikta minik flama (tasarim notu: takim renkli varyant)
+	p(ox + 1.0, oy + 2.4, 0.5, 3.6, col("#6b7280"))
+	var fy := oy + 2.4 + sin(t * 5.0) * 0.3
+	p(ox + 1.5, fy, 1.8, 1.2, col(T["main"]))
 
 
 func _b_turret(t: float, T: Dictionary) -> void:
@@ -892,18 +895,52 @@ func bake_tile_frame(kind: StringName, t: float, seed_v: int) -> Image:
 			p(3.0, 12.0, 2.0, 0.8, col("#5e564a"))
 			p(12.0, 4.0, 1.6, 0.7, col("#5e564a"))
 		&"mountain":
-			# GECILMEZ buyuk dag: koyu kaya govde + karli zirve
-			_t_ground(seed_v, col("#4f4a55"), col("#443f4a"), col("#5b5566"))
-			disc(8, 10, 6.2, col("#5b5566"))
-			disc(8, 9, 5.2, col("#6a6376"))
-			disc(7, 7.4, 3.4, col("#7a7387"))
-			disc(7, 5.8, 2.0, col("#e8ecf2"))   # kar zirve
-			disc(9.5, 6.8, 1.2, col("#d8dee8"))
-			p(3.4, 11.5, 2.2, 0.8, col("#3a3642"))
-			p(10.5, 12.0, 2.4, 0.8, col("#3a3642"))
-			var mg := (sin(t * 1.4 + seed_v) + 1.0) / 2.0
-			if mg > 0.75:
-				p(6.4, 5.6, 0.9, 0.9, rgba(255, 255, 255, mg))
+			# Asset Bible #3 DAG (birebir): kaya masifi + basamakli karli zirve
+			# (sol aydinlik / sag golgeli), catlaklar, etekte moloz
+			p(0, 0, 16, 16, col("#737983"))
+			p(0, 9, 16, 7, col("#565b65"))      # koyu alt govde
+			p(0, 9, 16, 0.7, col("#828892"))    # sirt isigi
+			for i in 6:
+				var w := 2.0 + i * 2.2
+				var x := 8.0 - w / 2.0
+				var y := 1.0 + i * 2.0
+				p(x, y, w, 2.15, col("#878e99"))
+				p(x, y, w, 0.7, col("#9aa1ac"))
+				p(8, y, w / 2.0, 2.15, col("#6b717c"))
+			# kar baslik
+			p(7, 1, 2, 1.7, col("#eef3f8"))
+			p(5.9, 2.6, 4.2, 1.5, col("#dde6ef"))
+			p(6.4, 1.2, 1.4, 1.4, col("#ffffff"))
+			p(5.2, 4.6, 2, 1, col("#cfd8e2"))
+			# catlaklar
+			p(9.2, 5, 0.5, 6, rgba(82, 87, 97, 0.5))
+			p(5.6, 7, 0.5, 5, rgba(82, 87, 97, 0.376))
+			# etekte moloz
+			for i in 6:
+				p(_mrand(seed_v, i) * 14.0 + 1.0, 12.4 + _mrand(seed_v, i + 5) * 3.0, 1, 1,
+					col("#565b65") if _mrand(seed_v, i + 2) > 0.5 else col("#8a909b"))
+		&"ravine":
+			# Asset Bible #3 VADI (birebir): cimi yaran derin bogaz — dikeyde
+			# kesintisiz baglanir; gecilmez ama KOPRU kurulabilir
+			p(0, 0, 16, 16, col("#5fb84f"))   # cim zemin (kenarlar)
+			for i in 10:
+				p(_vrand(seed_v, i) * 15.0, _vrand(seed_v, i + 40) * 15.0, 1, 1,
+					col("#54a945") if _vrand(seed_v, i + 9) > 0.5 else col("#74cf63"))
+			p(3.4, 0, 9.2, 16, col("#6e5638"))    # kahverengi kenar (en genis)
+			p(4.3, 0, 7.4, 16, col("#4a3a24"))    # duvar orta
+			p(5.2, 0, 5.6, 16, col("#2c2014"))    # derin duvar
+			p(6.2, 0, 3.6, 16, col("#160f08"))    # golge bogazi
+			p(7.1, 0, 1.8, 16, col("#0c1310"))    # dipsiz karanlik
+			p(3.4, 0, 0.9, 16, col("#8a6e46"))    # aydinlik sol dudak
+			p(11.7, 0, 0.9, 16, col("#3a2c1d"))   # koyu sag dudak
+			for i in 3:
+				var yy := 2.5 + i * 5.0 + _vrand(seed_v, i) * 2.0
+				p(4.5, yy, 1.5, 0.9, col("#5a4632"))
+				p(9.8, yy, 1.4, 0.9, col("#241a10"))
+			for i in 5:
+				var ny := _vrand(seed_v, i) * 15.0
+				p(2.8 + _vrand(seed_v, i + 2) * 1.6, ny, 1.3, 1.3, col("#54a945"))
+				p(11.2 + _vrand(seed_v, i + 7) * 1.4, ny, 1.3, 1.3, col("#4f8f3a"))
 		# --- ozellik katmani: SEFFAF zemin (cim VEYA kar ustune bindirilir) ---
 		&"forest":
 			_t_tree(t, seed_v)
@@ -912,6 +949,18 @@ func bake_tile_frame(kind: StringName, t: float, seed_v: int) -> Image:
 		&"gold":
 			_t_gold(t, seed_v)
 	return frame
+
+
+func _mrand(seed_v: int, n: int) -> float:
+	## Tasarimdaki dag r(): sin(seed*53.7 + n*11.3) * 43758.5 kesirli kismi.
+	var x := sin(float(seed_v) * 53.7 + float(n) * 11.3) * 43758.5
+	return x - floorf(x)
+
+
+func _vrand(seed_v: int, n: int) -> float:
+	## Tasarimdaki vadi r(): sin(seed*71.3 + n*17.9) * 43758.5 kesirli kismi.
+	var x := sin(float(seed_v) * 71.3 + float(n) * 17.9) * 43758.5
+	return x - floorf(x)
 
 
 func _t_ground(seed_v: int, base: Color, dark: Color, light: Color) -> void:

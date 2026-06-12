@@ -22,7 +22,7 @@ const MINI_COLORS := {
 	D.Tile.BRIDGE: Color("#b07a43"), D.Tile.FOREST: Color("#2f8a3e"),
 	D.Tile.STONE: Color("#9aa0a9"), D.Tile.GOLD: Color("#f3c64a"),
 	D.Tile.SNOW: Color("#e6edf3"), D.Tile.HILL: Color("#8d8273"),
-	D.Tile.MOUNTAIN: Color("#4f4a55"),
+	D.Tile.MOUNTAIN: Color("#737983"), D.Tile.RAVINE: Color("#2c2014"),
 }
 
 var game: Node2D = null
@@ -61,6 +61,7 @@ var end_overlay: Control
 var end_icon: TextureRect
 var end_title: Label
 var end_reason: Label
+var pause_overlay: Control
 
 var _sel: Array = []
 var _refresh_t := 0.0
@@ -77,6 +78,7 @@ func _ready() -> void:
 	_build_army_panel()
 	_build_minimap()
 	_build_bottom()
+	_build_pause_menu()
 	_build_end_overlay()
 
 	Bus.resources_changed.connect(_on_res)
@@ -125,19 +127,19 @@ func _build_top_bar() -> void:
 	bar.add_theme_constant_override("separation", 7)
 	top.add_child(bar)
 
-	# kaynak pod'lari: ikon + deger (+gelir)
+	# kaynak pod'lari: ikon + deger (+gelir) — kompakt
 	for kind in D.RES_KINDS:
-		var pod := _pod(4)
+		var pod := _pod(3)
 		bar.add_child(pod)
 		var h := HBoxContainer.new()
-		h.add_theme_constant_override("separation", 4)
+		h.add_theme_constant_override("separation", 3)
 		pod.add_child(h)
-		h.add_child(_icon_rect(UiKit.icon_tex(StringName(kind)), 22))
+		h.add_child(_icon_rect(UiKit.icon_tex(StringName(kind)), 17))
 		var v := VBoxContainer.new()
 		v.add_theme_constant_override("separation", 0)
 		h.add_child(v)
 		var val := Label.new()
-		UiKit.label(val, 10)
+		UiKit.label(val, 9)
 		v.add_child(val)
 		res_value_labels[kind] = val
 		var inc := Label.new()
@@ -146,46 +148,46 @@ func _build_top_bar() -> void:
 		res_income_labels[kind] = inc
 
 	# nufus pod'u: ikon + sayi + bar
-	var ppod := _pod(4)
+	var ppod := _pod(3)
 	bar.add_child(ppod)
 	var ph := HBoxContainer.new()
-	ph.add_theme_constant_override("separation", 5)
+	ph.add_theme_constant_override("separation", 4)
 	ppod.add_child(ph)
-	ph.add_child(_icon_rect(UiKit.icon_tex(&"pop"), 22))
+	ph.add_child(_icon_rect(UiKit.icon_tex(&"pop"), 17))
 	var pv := VBoxContainer.new()
-	pv.add_theme_constant_override("separation", 3)
+	pv.add_theme_constant_override("separation", 2)
 	ph.add_child(pv)
 	pop_label = Label.new()
-	UiKit.label(pop_label, 9)
+	UiKit.label(pop_label, 8)
 	pv.add_child(pop_label)
-	pop_bar = UiKit.make_bar(pv, 62, 5, UiKit.ACCENT_BLUE)
+	pop_bar = UiKit.make_bar(pv, 52, 4, UiKit.ACCENT_BLUE)
 
-	# metropol pod'u: etiket + bar + bina noktalari
-	var mpod := _pod(4)
+	# metropol pod'u: etiket + bar + bina noktalari (kompakt)
+	var mpod := _pod(3)
 	bar.add_child(mpod)
 	var mv := VBoxContainer.new()
-	mv.add_theme_constant_override("separation", 3)
+	mv.add_theme_constant_override("separation", 2)
 	mpod.add_child(mv)
 	var mh := HBoxContainer.new()
-	mh.add_theme_constant_override("separation", 8)
+	mh.add_theme_constant_override("separation", 6)
 	mv.add_child(mh)
 	var mtitle := Label.new()
 	mtitle.text = "METROPOL"
-	UiKit.label(mtitle, 8, UiKit.ACCENT)
+	UiKit.label(mtitle, 7, UiKit.ACCENT)
 	mh.add_child(mtitle)
 	metro_pop_label = Label.new()
-	UiKit.label(metro_pop_label, 8, UiKit.TEXT_DIM)
+	UiKit.label(metro_pop_label, 7, UiKit.TEXT_DIM)
 	mh.add_child(metro_pop_label)
 	var mb := HBoxContainer.new()
-	mb.add_theme_constant_override("separation", 6)
+	mb.add_theme_constant_override("separation", 5)
 	mv.add_child(mb)
-	metro_bar = UiKit.make_bar(mb, 96, 6, UiKit.ACCENT)
+	metro_bar = UiKit.make_bar(mb, 78, 5, UiKit.ACCENT)
 	var dots := HBoxContainer.new()
 	dots.add_theme_constant_override("separation", 2)
 	mb.add_child(dots)
 	for _i in D.metro_types():
 		var dot := ColorRect.new()
-		dot.custom_minimum_size = Vector2(5, 5)
+		dot.custom_minimum_size = Vector2(4, 4)
 		dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		dot.color = Color(0, 0, 0, 0.45)
 		dots.add_child(dot)
@@ -196,17 +198,17 @@ func _build_top_bar() -> void:
 	bar.add_child(stretch)
 
 	# harita rozeti
-	var mappod := _pod(5)
+	var mappod := _pod(4)
 	bar.add_child(mappod)
 	var maph := HBoxContainer.new()
-	maph.add_theme_constant_override("separation", 6)
+	maph.add_theme_constant_override("separation", 5)
 	mappod.add_child(maph)
 	var mapk := Label.new()
 	mapk.text = "HARİTA"
-	UiKit.label(mapk, 8, UiKit.TEXT_DIM)
+	UiKit.label(mapk, 7, UiKit.TEXT_DIM)
 	maph.add_child(mapk)
 	map_value = Label.new()
-	UiKit.label(map_value, 9)
+	UiKit.label(map_value, 8)
 	var map_keys: Array[StringName] = [&"map_river", &"map_lake", &"map_plains", &"map_snow", &"map_valley"]
 	map_value.text = Tr.t(map_keys[GameState.map_type]).to_upper()
 	maph.add_child(map_value)
@@ -214,7 +216,7 @@ func _build_top_bar() -> void:
 	# savas rozeti
 	war_btn = Button.new()
 	war_btn.add_theme_font_override("font", FONT)
-	war_btn.add_theme_font_size_override("font_size", 9)
+	war_btn.add_theme_font_size_override("font_size", 8)
 	war_btn.pressed.connect(func(): Net.send_declare_war())
 	war_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	bar.add_child(war_btn)
@@ -233,33 +235,33 @@ func _build_toasts() -> void:
 func _build_army_panel() -> void:
 	var army_panel := PanelContainer.new()
 	army_panel.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
-	army_panel.offset_right = -8.0
-	army_panel.offset_left = -158.0
-	army_panel.offset_top = -190.0
+	army_panel.offset_right = -6.0
+	army_panel.offset_left = -136.0
+	army_panel.offset_top = -160.0
 	army_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	army_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	UiKit.panel(army_panel, 0.0, 3.0)
+	UiKit.panel(army_panel, 0.0, 2.0)
 	add_child(army_panel)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 4)
+	box.add_theme_constant_override("separation", 3)
 	army_panel.add_child(box)
 	var head := HBoxContainer.new()
 	box.add_child(head)
 	var t := Label.new()
 	t.text = "ORDU"
-	UiKit.label(t, 9, UiKit.ACCENT)
+	UiKit.label(t, 8, UiKit.ACCENT)
 	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(t)
 	army_pop = Label.new()
-	UiKit.label(army_pop, 8, UiKit.TEXT_DIM)
+	UiKit.label(army_pop, 7, UiKit.TEXT_DIM)
 	head.add_child(army_pop)
 	for tp in ARMY_TYPES:
 		var b := Button.new()
-		UiKit.button(b, 8)
+		UiKit.button(b, 7)
 		b.icon = _unit_icon(tp)
 		b.expand_icon = false
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.add_theme_constant_override("icon_max_width", 18)
+		b.add_theme_constant_override("icon_max_width", 15)
 		b.tooltip_text = Tr.t(tp)
 		b.pressed.connect(_on_army_pressed.bind(tp))
 		army_rows[tp] = b
@@ -269,19 +271,19 @@ func _build_army_panel() -> void:
 func _build_minimap() -> void:
 	var mp := PanelContainer.new()
 	mp.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	mp.offset_left = -158.0
-	mp.offset_right = -8.0
-	mp.offset_bottom = -132.0
-	mp.offset_top = -132.0 - 150.0
+	mp.offset_left = -136.0
+	mp.offset_right = -6.0
+	mp.offset_bottom = -98.0
+	mp.offset_top = -98.0 - 128.0
 	mp.mouse_filter = Control.MOUSE_FILTER_STOP
-	UiKit.panel(mp, 0.0, 3.0)
+	UiKit.panel(mp, 0.0, 2.0)
 	add_child(mp)
 	var inner := _pod(3)
 	mp.add_child(inner)
 	mini_rect = TextureRect.new()
 	mini_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	mini_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	mini_rect.custom_minimum_size = Vector2(112, 112)
+	mini_rect.custom_minimum_size = Vector2(96, 96)
 	mini_rect.gui_input.connect(_on_mini_input)
 	mini_rect.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	inner.add_child(mini_rect)
@@ -292,7 +294,7 @@ func _build_bottom() -> void:
 	bottom = PanelContainer.new()
 	bottom.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	bottom.offset_left = 8.0
-	bottom.offset_right = -166.0
+	bottom.offset_right = -144.0
 	bottom.offset_top = -124.0
 	bottom.offset_bottom = -6.0
 	bottom.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -357,6 +359,72 @@ func _build_bottom() -> void:
 	queue_box.add_child(queue_pct)
 	queue_box.visible = false
 	bottom.visible = false
+
+
+func _build_pause_menu() -> void:
+	## ESC menusu: Devam / Ana Menu / Cikis. Tek kisilikte oyunu gercekten
+	## DURAKLATIR; cok oyunculuda oyun arka planda devam eder (host-otoriter).
+	pause_overlay = ColorRect.new()
+	(pause_overlay as ColorRect).color = Color(0.0, 0.0, 0.0, 0.55)
+	pause_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pause_overlay.visible = false
+	pause_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(pause_overlay)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pause_overlay.add_child(center)
+	var panel := PanelContainer.new()
+	UiKit.panel(panel, 0.0, 16.0)
+	center.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	panel.add_child(box)
+	var title := Label.new()
+	title.text = Tr.t(&"paused_title")
+	UiKit.label(title, 14, UiKit.GOLD)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title)
+	var hint := Label.new()
+	hint.text = Tr.t(&"paused_hint_sp" if not Net.net_active else &"paused_hint_mp")
+	UiKit.label(hint, 7, UiKit.TEXT_DIM)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(hint)
+	var resume := Button.new()
+	resume.text = Tr.t(&"resume")
+	UiKit.button(resume, 11, UiKit.ACCENT_BLUE)
+	resume.custom_minimum_size = Vector2(240, 40)
+	resume.pressed.connect(toggle_pause)
+	box.add_child(resume)
+	var menu := Button.new()
+	menu.text = Tr.t(&"main_menu")
+	UiKit.button(menu, 11)
+	menu.custom_minimum_size = Vector2(240, 40)
+	menu.pressed.connect(func():
+		get_tree().paused = false
+		_on_main_menu())
+	box.add_child(menu)
+	var quit := Button.new()
+	quit.text = Tr.t(&"quit")
+	UiKit.button(quit, 11)
+	quit.custom_minimum_size = Vector2(240, 40)
+	quit.pressed.connect(func(): get_tree().quit())
+	box.add_child(quit)
+
+
+func toggle_pause() -> void:
+	pause_overlay.visible = not pause_overlay.visible
+	if not Net.net_active:
+		# tek kisilik: sim gercekten durur (HUD katmani ALWAYS modda calisir)
+		get_tree().paused = pause_overlay.visible
+
+
+func _unhandled_input(ev: InputEvent) -> void:
+	# pause acikken oyun agaci durur; ESC'yle kapatmayi HUD yakalar
+	if pause_overlay != null and pause_overlay.visible \
+			and ev is InputEventKey and ev.pressed and ev.keycode == KEY_ESCAPE:
+		toggle_pause()
+		get_viewport().set_input_as_handled()
 
 
 func _build_end_overlay() -> void:

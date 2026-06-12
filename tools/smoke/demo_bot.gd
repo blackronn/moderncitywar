@@ -115,6 +115,8 @@ func _go() -> void:
 	if arg_has(&"--cam-bottom"):
 		# haritanin EN ALTI: HUD payi sayesinde panel ustunde gorunmeli
 		game.cam.position = Vector2(GameState.spawns[0].x * D.TILE, 9999.0)
+	if arg_has(&"--pause"):
+		game.hud.toggle_pause()   # ESC menusu gorseli
 
 
 func _spread_diag(ids: PackedInt32Array, rally: Vector2) -> void:

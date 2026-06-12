@@ -138,13 +138,28 @@ func run() -> Array:
 				if not has_snow:
 					errs.append("seed %d: kar haritasinda kar yok" % seed_v)
 			D.MapType.VALLEY:
-				var has_hill := false
+				# yeni vadi: BOGAZ (ravine) var — gecilmez ama kopru kurulabilir
+				var ravine_n := 0
 				for i in grid.size():
-					if grid[i] == D.Tile.HILL:
-						has_hill = true
-						break
-				if not has_hill:
-					errs.append("seed %d: vadi haritasinda engebe yok" % seed_v)
+					if grid[i] == D.Tile.RAVINE:
+						ravine_n += 1
+				if ravine_n < 20:
+					errs.append("seed %d: vadi haritasinda bogaz yok/az (%d)" % [seed_v, ravine_n])
+
+		# KAYNAK SIMETRISI: sol/sag yakada orman-tas-altin SAYILARI birebir esit
+		for kind: int in [D.Tile.FOREST, D.Tile.STONE, D.Tile.GOLD]:
+			var left_n := 0
+			var right_n := 0
+			for y in D.MAP_H:
+				for x in D.MAP_W:
+					if grid[y * D.MAP_W + x] != kind:
+						continue
+					if x < D.MAP_W / 2:
+						left_n += 1
+					else:
+						right_n += 1
+			if left_n != right_n:
+				errs.append("seed %d: kaynak %d simetrik degil (%d/%d)" % [seed_v, kind, left_n, right_n])
 
 	if seen_types.size() < 5:
 		errs.append("test seed'leri 5 harita tipini de kapsamiyor (%d tip)" % seen_types.size())

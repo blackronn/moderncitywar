@@ -97,6 +97,9 @@ func _ready() -> void:
 
 	var hud_layer := CanvasLayer.new()
 	hud_layer.name = "HUD"
+	# ESC menusu tek kisilikte agaci duraklatir; HUD'un calismaya devam
+	# etmesi (Devam Et butonu + ESC) icin katman ALWAYS modda
+	hud_layer.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(hud_layer)
 	hud = HudScript.new()
 	hud.name = "HudRoot"
@@ -269,12 +272,13 @@ func _ghost_valid(tl: Vector2i, bdef: Dictionary) -> bool:
 	if not GameState.can_afford(GameState.my_pid, bdef["cost"]):
 		return false
 	if bdef.has("bridge"):
-		# kopru: su hucresi + yurunebilir komsu
-		if GameState.grid_at(tl) != D.Tile.WATER:
+		# kopru: su VEYA vadi bogazi + yurunebilir komsu
+		var ct := GameState.grid_at(tl)
+		if ct != D.Tile.WATER and ct != D.Tile.RAVINE:
 			return false
 		for off in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
 			var t := GameState.grid_at(tl + off)
-			if (t != -1 and t != D.Tile.WATER and t != D.Tile.HILL) \
+			if (t != -1 and MapGen.walkable(t) and t != D.Tile.HILL) \
 					or not pathing.is_solid(tl + off):
 				return true
 		return false

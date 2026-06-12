@@ -8,7 +8,7 @@ extends Camera2D
 const D := preload("res://scripts/autoload/defs.gd")
 const PAN_SPEED := 420.0
 const HUD_BOTTOM_PX := 244.0   # insa panelinin en yuksek hali + kenar payi
-const HUD_RIGHT_PX := 172.0    # ordu/minimap sutunu
+const HUD_RIGHT_PX := 142.0    # ordu/minimap sutunu (kompakt)
 const HUD_TOP_PX := 48.0       # ust kaynak bari
 
 var zoom_level := 2

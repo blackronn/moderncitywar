@@ -17,6 +17,7 @@ const SRC_IDS := {
 	D.Tile.SNOW: 6,
 	D.Tile.HILL: 7,
 	D.Tile.MOUNTAIN: 8,
+	D.Tile.RAVINE: 9,
 }
 const KIND_NAMES := {
 	D.Tile.GRASS: &"grass",
@@ -28,6 +29,7 @@ const KIND_NAMES := {
 	D.Tile.SNOW: &"snow",
 	D.Tile.HILL: &"hill",
 	D.Tile.MOUNTAIN: &"mountain",
+	D.Tile.RAVINE: &"ravine",
 }
 
 
@@ -73,6 +75,8 @@ static func paint(terrain: TileMapLayer, features: TileMapLayer, grid: PackedInt
 					terrain.set_cell(cell, SRC_IDS[D.Tile.HILL], Vector2i(0, _variant(cell, &"hill")))
 				D.Tile.MOUNTAIN:
 					terrain.set_cell(cell, SRC_IDS[D.Tile.MOUNTAIN], Vector2i(0, _variant(cell, &"mountain")))
+				D.Tile.RAVINE:
+					terrain.set_cell(cell, SRC_IDS[D.Tile.RAVINE], Vector2i(0, _variant(cell, &"ravine")))
 				D.Tile.SNOW:
 					terrain.set_cell(cell, SRC_IDS[D.Tile.SNOW], Vector2i(0, _variant(cell, &"snow")))
 				_:
@@ -86,9 +90,15 @@ static func paint(terrain: TileMapLayer, features: TileMapLayer, grid: PackedInt
 
 
 static func _variant(cell: Vector2i, kname: StringName) -> int:
-	# deterministik varyant secimi (iki ucta ayni gorunum; rng yok)
+	# deterministik varyant secimi (iki ucta ayni gorunum; rng yok).
+	# AYNA-SIMETRIK: hash kanonik hucreden hesaplanir — sol/sag (4 oyuncuda
+	# ust/alt da) yakalardaki kaynaklar PIKSEL PIKSEL ayni gorunur
 	var variants: int = Bible.TILE_ANIMS[kname][0]
-	var n := cell.x * 374761393 + cell.y * 668265263
+	var cx := mini(cell.x, D.MAP_W - 1 - cell.x)
+	var cy := cell.y
+	if GameState.player_count > 2:
+		cy = mini(cell.y, D.MAP_H - 1 - cell.y)
+	var n := cx * 374761393 + cy * 668265263
 	n = (n ^ (n >> 13)) * 1274126177
 	n = (n ^ (n >> 16)) & 0x7fffffff
 	return n % variants

@@ -287,8 +287,10 @@ static func _zone_ok(cell: Vector2i, zone_pid: int, allow_neutral: bool, players
 
 
 func _validate_bridge(cell: Vector2i, afford: bool, zone_pid: int, allow_neutral: bool) -> int:
-	## Kopru parcasi: SU hucresine, yurunebilir bir komsuya bitisik (adim adim).
-	if GameState.grid_at(cell) != D.Tile.WATER:
+	## Kopru parcasi: SU veya VADI BOGAZI hucresine, yurunebilir bir komsuya
+	## bitisik (adim adim insa edilir).
+	var ct := GameState.grid_at(cell)
+	if ct != D.Tile.WATER and ct != D.Tile.RAVINE:
 		return D.Reject.BAD_SPOT
 	if not _zone_ok(cell, zone_pid, allow_neutral, GameState.player_count):
 		return D.Reject.BORDER
@@ -299,7 +301,7 @@ func _validate_bridge(cell: Vector2i, afford: bool, zone_pid: int, allow_neutral
 	for off: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
 		var n := cell + off
 		var t := GameState.grid_at(n)
-		if t != -1 and t != D.Tile.WATER and t != D.Tile.HILL:
+		if t != -1 and MapGen.walkable(t) and t != D.Tile.HILL:
 			has_anchor = true
 			break
 		if _bridge_entity_at(n) != null:

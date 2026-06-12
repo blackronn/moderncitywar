@@ -66,10 +66,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif placing:
 			game.update_ghost(get_global_mouse_position())
 	elif event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		# oncelik: yerlestirmeyi iptal > secimi birak > DURAKLATMA MENUSU
 		if placing:
 			cancel_placement()
-		else:
+		elif not selected.is_empty():
 			_set_selection([])
+		elif game.hud != null:
+			game.hud.toggle_pause()
 	elif event is InputEventKey and event.pressed and event.keycode == KEY_M:
 		# mayin suphesi isareti (lokal)
 		var cell := Vector2i((get_global_mouse_position() / float(D.TILE)).floor())

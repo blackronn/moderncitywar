@@ -95,28 +95,29 @@ static func generate(seed_v: int, players := 2) -> Dictionary:
 				var hs := Vector2i(rng.randi_range(2, cl - 3), rng.randi_range(4, h - 5))
 				_walk_blob_kind(rng, grid, cl, hs, D.Tile.HILL, rng.randi_range(5, 9), D.Tile.SNOW)
 		D.MapType.VALLEY:
-			# vadi: orta gecide bakan kalin kayalik sirtlar, 2 gecit
-			var ridge_x := cl - 9
+			# VADI (Asset Bible #3): cimi yaran derin BOGAZ (ravine) — gecilmez
+			# ama SU GIBI kopru kurulabilir; 2 dogal gecit + istenirse kopru
+			var ravine_x := cl - 9
 			var gap1 := rng.randi_range(6, 16)
 			var gap2 := rng.randi_range(30, 40)
 			for y in h:
-				if absi(y - gap1) <= 2 or absi(y - gap2) <= 2:
-					continue   # gecitler
-				for dx in 3:
-					grid[y * w + (ridge_x + dx)] = D.Tile.HILL
-			# sirt uzerinde tek tuk kaya cikintisi disari
+				if absi(y - gap1) <= 1 or absi(y - gap2) <= 1:
+					continue   # dogal gecitler
+				grid[y * w + ravine_x] = D.Tile.RAVINE
+				grid[y * w + (ravine_x + 1)] = D.Tile.RAVINE
+			# bogaz kenarinda tek tuk kayalik engebe
 			for _i in 4:
-				var hs := Vector2i(ridge_x + rng.randi_range(-2, 4), rng.randi_range(3, h - 4))
-				_walk_blob_kind(rng, grid, cl, hs, D.Tile.HILL, rng.randi_range(3, 6), D.Tile.GRASS)
+				var hs := Vector2i(ravine_x + rng.randi_range(-3, 5), rng.randi_range(3, h - 4))
+				_walk_blob_kind(rng, grid, cl, hs, D.Tile.HILL, rng.randi_range(3, 5), D.Tile.GRASS)
 			if quad:
-				# 4 oyuncu: YATAY sirt da (gecitli) — ceyrekler arasi koridorlar
+				# 4 oyuncu: ceyrekler arasi YATAY dag kusagi (gecitli)
 				var ridge_y := cl - 9
 				var gx := rng.randi_range(6, 16)
 				for x in range(0, cl + 1):
 					if absi(x - gx) <= 2:
 						continue
-					for dy in 3:
-						grid[(ridge_y + dy) * w + x] = D.Tile.HILL
+					for dy in 2:
+						grid[(ridge_y + dy) * w + x] = D.Tile.MOUNTAIN
 
 	# --- spawn'lar: belediye 2x2'nin sol-ust kosesi ---
 	# 2 oyuncu: orta hizada karsilikli; 3-4 oyuncu: dort kose (ceyrek merkezleri)
@@ -267,5 +268,6 @@ static func _near_bridge(y: int, bridge_rows: Array[int]) -> bool:
 
 
 static func walkable(tile: int) -> bool:
-	## Su ve DAG gecilmez; HILL yurunur ama yavas (TILE_SPEED).
-	return tile != D.Tile.WATER and tile != D.Tile.MOUNTAIN and tile != -1
+	## Su, DAG ve BOGAZ gecilmez; HILL yurunur ama yavas (TILE_SPEED).
+	return tile != D.Tile.WATER and tile != D.Tile.MOUNTAIN \
+		and tile != D.Tile.RAVINE and tile != -1
