@@ -1,21 +1,21 @@
 extends Camera2D
 ## RTS kamerasi: WASD/ok tuslari + orta tus surukleme ile pan,
 ## tekerlekle TAM SAYI zoom adimlari (pixel titremesini onler).
+## HUD PAYI: alt bar / sag panel haritanin kenarini kaliciydi kapatiyordu;
+## limitler HUD kadar disari tasar ki en alttaki/sagdaki kaynaklar panelin
+## USTUNE kaydirilabilsin (yoksa oraya isci gonderilemiyordu).
 
 const D := preload("res://scripts/autoload/defs.gd")
 const PAN_SPEED := 420.0
+const HUD_BOTTOM_PX := 244.0   # insa panelinin en yuksek hali + kenar payi
+const HUD_RIGHT_PX := 172.0    # ordu/minimap sutunu
+const HUD_TOP_PX := 48.0       # ust kaynak bari
 
 var zoom_level := 2
 
 
 func _ready() -> void:
 	make_current()
-	# gorunum harita disina tasmasin (zoom 1'de harita viewport'tan kucuk
-	# kalirsa sol-ust koseye yapisir, kabul)
-	limit_left = 0
-	limit_top = 0
-	limit_right = D.MAP_W * D.TILE
-	limit_bottom = D.MAP_H * D.TILE
 	_apply_zoom()
 
 
@@ -31,8 +31,9 @@ func _process(dt: float) -> void:
 		dir.x += 1.0
 	if dir != Vector2.ZERO:
 		position += dir.normalized() * PAN_SPEED * dt / float(zoom_level)
-	position.x = clampf(position.x, 0.0, D.MAP_W * D.TILE)
-	position.y = clampf(position.y, 0.0, D.MAP_H * D.TILE)
+	position.x = clampf(position.x, 0.0, D.MAP_W * D.TILE + HUD_RIGHT_PX / float(zoom_level))
+	position.y = clampf(position.y, -HUD_TOP_PX / float(zoom_level),
+		D.MAP_H * D.TILE + HUD_BOTTOM_PX / float(zoom_level))
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -49,3 +50,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _apply_zoom() -> void:
 	zoom = Vector2(zoom_level, zoom_level)
+	# limitler zoom'a gore: HUD'un ekranda kapladigi alan dunya olceginde
+	# zoom'la kuculur; harita kenari + HUD payi kadar kaydirma serbest
+	limit_left = 0
+	limit_top = -int(ceilf(HUD_TOP_PX / float(zoom_level)))
+	limit_right = D.MAP_W * D.TILE + int(ceilf(HUD_RIGHT_PX / float(zoom_level)))
+	limit_bottom = D.MAP_H * D.TILE + int(ceilf(HUD_BOTTOM_PX / float(zoom_level)))

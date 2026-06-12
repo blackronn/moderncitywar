@@ -597,34 +597,43 @@ func _cost_chip(kind: String, n: int) -> Control:
 
 func _card(icon: Texture2D, title: String, costs: Dictionary, extra := "") -> Button:
 	## Tasarimdaki ikon karti: ikon + ad + maliyet cipleri (+istege bagli stat).
+	## Uzun adlar SATIR KIRAR, cok maliyetli kartlarda cipler alt satira tasar
+	## (yazi/cip kart disinda kalmasin).
 	var b := Button.new()
 	UiKit.button(b, 7)
-	b.custom_minimum_size = Vector2(82, 92 if extra != "" else 84)
+	b.custom_minimum_size = Vector2(88, 104 if extra != "" else 96)
 	var v := VBoxContainer.new()
 	v.set_anchors_preset(Control.PRESET_FULL_RECT)
 	v.offset_top = 4.0
 	v.offset_bottom = -4.0
+	v.offset_left = 3.0
+	v.offset_right = -3.0
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_theme_constant_override("separation", 2)
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(v)
-	var ic := _icon_rect(icon, 34)
+	var ic := _icon_rect(icon, 32)
 	ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	v.add_child(ic)
 	var nl := Label.new()
 	UiKit.label(nl, 7)
 	nl.text = title
 	nl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	nl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_child(nl)
 	if extra != "":
 		var ex := Label.new()
 		UiKit.label(ex, 6, UiKit.TEXT_DIM)
 		ex.text = extra
 		ex.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		ex.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		ex.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		v.add_child(ex)
-	var chips := HBoxContainer.new()
-	chips.alignment = BoxContainer.ALIGNMENT_CENTER
-	chips.add_theme_constant_override("separation", 3)
+	var chips := HFlowContainer.new()
+	chips.alignment = FlowContainer.ALIGNMENT_CENTER
+	chips.add_theme_constant_override("h_separation", 3)
+	chips.add_theme_constant_override("v_separation", 2)
 	chips.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(chips)
 	for kind in costs:
@@ -715,8 +724,15 @@ func _refresh_panel() -> void:
 			_refresh_panel())
 		form_box.add_child(hb)
 
-	# insa menusu 2 satira tasabilir (11 kart): panel yuksekligi icerige gore
-	bottom.offset_top = -208.0 if has_worker else -124.0
+	# panel yuksekligi icerige gore: isci insa menusu 2 satir kart,
+	# kisla/fabrika tek satir buyuk kart, digerleri kompakt
+	if has_worker:
+		bottom.offset_top = -236.0
+	elif first.def.has("size") and first.owner_pid == GameState.my_pid \
+			and first.is_complete() and (first.def.has("trains") or first.def.has("up_cost")):
+		bottom.offset_top = -178.0
+	else:
+		bottom.offset_top = -124.0
 
 	if has_worker:
 		for bid in BUILDABLE:

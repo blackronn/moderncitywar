@@ -112,6 +112,9 @@ func _go() -> void:
 				if arg_has(&"--cam-select"):
 					game.cam.position = e.position
 				break
+	if arg_has(&"--cam-bottom"):
+		# haritanin EN ALTI: HUD payi sayesinde panel ustunde gorunmeli
+		game.cam.position = Vector2(GameState.spawns[0].x * D.TILE, 9999.0)
 
 
 func _spread_diag(ids: PackedInt32Array, rally: Vector2) -> void:
