@@ -302,28 +302,30 @@ func _build_bottom() -> void:
 	brow.add_theme_constant_override("separation", 10)
 	bottom.add_child(brow)
 
-	# secim portresi
-	var sel_pod := _pod(6)
-	sel_pod.custom_minimum_size = Vector2(216, 0)
+	# secim portresi (kompakt: birim secimi panelini buyutmesin)
+	var sel_pod := _pod(5)
+	sel_pod.custom_minimum_size = Vector2(184, 0)
 	brow.add_child(sel_pod)
 	var sh := HBoxContainer.new()
-	sh.add_theme_constant_override("separation", 9)
+	sh.add_theme_constant_override("separation", 7)
 	sel_pod.add_child(sh)
 	var frame := _pod(3)
+	frame.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	sh.add_child(frame)
-	portrait_icon = _icon_rect(null, 48)
+	portrait_icon = _icon_rect(null, 34)
 	frame.add_child(portrait_icon)
 	var sv := VBoxContainer.new()
-	sv.add_theme_constant_override("separation", 4)
+	sv.add_theme_constant_override("separation", 3)
 	sv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sv.alignment = BoxContainer.ALIGNMENT_CENTER
 	sh.add_child(sv)
 	sel_label = Label.new()
-	UiKit.label(sel_label, 9)
+	UiKit.label(sel_label, 8)
 	sv.add_child(sel_label)
 	sel_hp_label = Label.new()
-	UiKit.label(sel_hp_label, 8, UiKit.TEXT_DIM)
+	UiKit.label(sel_hp_label, 7, UiKit.TEXT_DIM)
 	sv.add_child(sel_hp_label)
-	sel_hp_bar = UiKit.make_bar(sv, 120, 7, UiKit.HP_GREEN)
+	sel_hp_bar = UiKit.make_bar(sv, 100, 6, UiKit.HP_GREEN)
 	form_box = HBoxContainer.new()
 	form_box.add_theme_constant_override("separation", 3)
 	sv.add_child(form_box)
@@ -642,18 +644,19 @@ func _card(icon: Texture2D, title: String, costs: Dictionary, extra := "") -> Bu
 
 
 func _stat_chip(k: String, v: String) -> Control:
-	var pod := _pod(6)
+	var pod := _pod(4)
+	pod.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 2)
+	box.add_theme_constant_override("separation", 1)
 	pod.add_child(box)
 	var kl := Label.new()
-	UiKit.label(kl, 7, UiKit.TEXT_DIM)
+	UiKit.label(kl, 6, UiKit.TEXT_DIM)
 	kl.text = k
 	kl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(kl)
 	var vl := Label.new()
-	UiKit.label(vl, 12)
+	UiKit.label(vl, 10)
 	vl.text = v
 	vl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(vl)
@@ -725,14 +728,16 @@ func _refresh_panel() -> void:
 		form_box.add_child(hb)
 
 	# panel yuksekligi icerige gore: isci insa menusu 2 satir kart,
-	# kisla/fabrika tek satir buyuk kart, digerleri kompakt
+	# kisla/fabrika tek satir buyuk kart, bina kompakt, ASKER en ince
 	if has_worker:
-		bottom.offset_top = -236.0
+		bottom.offset_top = -228.0
 	elif first.def.has("size") and first.owner_pid == GameState.my_pid \
 			and first.is_complete() and (first.def.has("trains") or first.def.has("up_cost")):
-		bottom.offset_top = -178.0
+		bottom.offset_top = -170.0
+	elif first.def.has("size"):
+		bottom.offset_top = -108.0
 	else:
-		bottom.offset_top = -124.0
+		bottom.offset_top = -88.0
 
 	if has_worker:
 		for bid in BUILDABLE:
