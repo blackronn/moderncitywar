@@ -211,6 +211,13 @@ func _death_visual(node: Node) -> void:
 		spawn_fx(&"explosion", node.position, 1.2 * size.x)
 
 
+func spawn_shell(from: Vector2, to: Vector2, flight: float) -> void:
+	## Havan mermisi: yay cizerek suzulur; patlama IMPACT event'iyle ayri gelir.
+	var s: Node2D = preload("res://scripts/shell_fx.gd").new()
+	fx.add_child(s)
+	s.launch(from, to, flight)
+
+
 func spawn_fx(fx_id: StringName, at: Vector2, fx_scale := 1.0, ttl := 0.0) -> void:
 	var meta: Array = Bible.FX[fx_id]
 	var s: Sprite2D = FxScript.new()

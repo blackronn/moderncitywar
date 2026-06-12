@@ -133,6 +133,11 @@ func _draw() -> void:
 	var half := Vector2(size) * D.TILE / 2.0
 	if selected:
 		draw_rect(Rect2(-half, Vector2(size) * D.TILE), Color(1, 1, 1, 0.85), false, 1.0)
+		# taret: vurus alani halkasi
+		var rt: float = def.get("range_t", 0.0)
+		if rt > 0.0 and def.get("dmg", 0) > 0:
+			draw_arc(Vector2.ZERO, rt * D.TILE, 0.0, TAU, 64, Color(1, 1, 1, 0.25), 1.0)
+			draw_circle(Vector2.ZERO, rt * D.TILE, Color(1, 1, 1, 0.05))
 	# gelistirme seviyesi: sol-ust kosede altin pip'ler (L2 = 1, L3 = 2)
 	for i in range(level - 1):
 		draw_rect(Rect2(-half.x + 1.0 + i * 4.0, -half.y + 1.0, 3.0, 3.0), Color(0.95, 0.82, 0.3))

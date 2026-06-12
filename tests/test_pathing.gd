@@ -57,6 +57,17 @@ func run() -> Array:
 		errs.append("baris grid'i rakip yariya yol verdi (sinir delik!)")
 	if not p.find(b, a, false, 2).is_empty():
 		errs.append("baris grid'i (P2) rakip yariya yol verdi")
+	# SINIR KESINDIR: cizgi otesi hedef istenince yol en fazla cizgiye kadar
+	# gider (find kapali hedefi kendi yakasindaki en yakin hucreye yonlendirir);
+	# yolun HICBIR hucresi obur yakada olamaz
+	for pt in p.find(a, Vector2i(D.MAP_W / 2, 6), false, 1):
+		if pt.x >= D.MAP_W / 2:
+			errs.append("P1 baristayken orta cizgiyi gecebildi: %s" % str(pt))
+			break
+	for pt in p.find(b, Vector2i(D.MAP_W / 2 - 1, 6), false, 2):
+		if pt.x < D.MAP_W / 2:
+			errs.append("P2 baristayken orta cizgiyi gecebildi: %s" % str(pt))
+			break
 
 	# === 4 oyuncu: ceyrek bolgeleri — kendi ceyrek VAR, capraz ceyrek YOK ===
 	var g4 := MapGen.generate(42, 4)   # 42 -> OVA (su yok, saf bolge testi)

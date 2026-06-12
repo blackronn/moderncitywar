@@ -57,15 +57,29 @@ func _go() -> void:
 	# su varsa kopru gosterimi: TAMAMLANMIS kopru + ustunde duran asker
 	# (koprunun birimin ALTINDA cizildigini dogrular — GroundDecals katmani)
 	_demo_bridge(sim)
-	# isciyi sec: alt panel insa menusu (2 satir, kum torbasi dahil) acilir
+	# secim: varsayilan isci (insa menusu); --select=<birim> ile degisir
+	# (orn. --select=mortar -> menzil halkasi gorseli)
+	var want: StringName = &"worker"
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--select="):
+			want = StringName(arg.get_slice("=", 1))
 	var game := get_tree().current_scene
 	var ic: Node = game.get_node_or_null("InputController")
 	if ic != null:
 		for e in GameState.entities.values():
-			if e.owner_pid == 1 and e.def_id == &"worker":
+			if e.owner_pid == 1 and e.def_id == want:
 				var sel: Array[int] = [e.id]
 				ic._set_selection(sel)
+				if arg_has(&"--cam-select"):
+					game.cam.position = e.position
 				break
+
+
+func arg_has(flag: StringName) -> bool:
+	for arg in OS.get_cmdline_user_args():
+		if StringName(arg) == flag:
+			return true
+	return false
 
 
 func _demo_bridge(sim: Node) -> void:

@@ -22,6 +22,7 @@ var path_i := 0
 var task := {}              # {"kind": &"idle"/&"move"/&"gather"/&"build"/&"attack"/&"heal", ...}
 var cooldown := 0.0
 var repath_block := 0       # tekrar yol arama frenleyici (tick)
+var setup_t := 0.0          # havan kurulumu: durduktan sonra ates icin kalan sn
 
 # --- istemci interpolasyonu ---
 var _has_snap := false
@@ -51,6 +52,7 @@ func setup(p_id: int, p_def_id: StringName, p_owner: int) -> void:
 	def = D.unit(def_id)
 	hp = def["hp"]
 	max_hp = def["hp"]
+	setup_t = def.get("setup_s", 0.0)   # havan dogdugu yerde de once kurulur
 	task = {"kind": &"idle"}
 	_anim_table = Bible.UNIT_ANIMS[def_id]
 	sprite = Sprite2D.new()
@@ -167,6 +169,13 @@ func set_hp(v: float) -> void:
 func _draw() -> void:
 	if selected:
 		draw_arc(Vector2(0, 4), 8.0, 0.0, TAU, 20, Color(1, 1, 1, 0.9), 1.0)
+		# vurus alani halkasi: menzil yaricapi (tile x 16 px)
+		var rt: float = def.get("range_t", 0.0)
+		if rt > 0.0 and (def.get("dmg", 0) > 0 or def.has("heal_rate")):
+			var rc := Color(0.45, 1.0, 0.55, 0.3) if def.has("heal_rate") \
+				else Color(1.0, 1.0, 1.0, 0.25)
+			draw_arc(Vector2.ZERO, rt * D.TILE, 0.0, TAU, 64, rc, 1.0)
+			draw_circle(Vector2.ZERO, rt * D.TILE, Color(rc.r, rc.g, rc.b, 0.05))
 	if hp < max_hp and hp > 0.0:
 		var w := 12.0
 		var frac := hp / max_hp

@@ -251,6 +251,8 @@ func _pick_enemy(wp: Vector2) -> int:
 	for e in GameState.entities.values():
 		if e.owner_pid == GameState.my_pid:
 			continue
+		if not e.visible:
+			continue   # rakibin gizli mayini: tiklanamaz/hedeflenemez
 		if e.def.has("speed_t"):
 			var d := wp.distance_to(e.position)
 			if d < best_d:

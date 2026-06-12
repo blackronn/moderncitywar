@@ -65,6 +65,8 @@ func _run() -> void:
 			for off in [Vector2i(-2, 1), Vector2i(-2, 3), Vector2i(-3, 2)]:
 				sim.spawn_unit(&"rifleman", 2, sim.cell_center(p2_tl + off))
 			sim.spawn_unit(&"rpg", 2, sim.cell_center(p2_tl + Vector2i(-3, 4)))
+			# havan: kurulum + suzulen mermi (Ev.SHELL) yolu da savasta calissin
+			sim.spawn_unit(&"mortar", 2, sim.cell_center(p2_tl + Vector2i(-4, 2)))
 			sim.recount_pop()
 			print("BOT_HOST P2 ordusu hazir")
 		"metro":

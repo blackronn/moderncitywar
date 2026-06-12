@@ -14,6 +14,7 @@ var next_id := 1
 var tick := 0
 var debug_speed := 1.0               # --speed=N ile hizlandirma (smoke testler)
 var node_res := {}                   # Vector2i -> kalan kaynak (orman/tas)
+var shells: Array = []               # ucustaki havan mermileri: {at, t, def_id, def, pid}
 var _res_dirty := false
 
 
@@ -66,6 +67,7 @@ func _physics_process(delta: float) -> void:
 	_tick_combat(dt)
 	_tick_healers(dt)
 	_tick_mines()
+	_tick_shells(dt)
 	if tick % 15 == 0 and _res_dirty:
 		_res_dirty = false
 		for pid in GameState.player_ids():
@@ -367,6 +369,8 @@ func handle_attack(pid: int, ids: PackedInt32Array, target_id: int) -> void:
 	var tgt: Node = GameState.ent(target_id)
 	if tgt == null or tgt.owner_pid == pid:
 		return
+	if tgt.def.has("mine"):
+		return   # rakip mayini istemci GORMEZ; sizan id'yle de hedeflenemez
 	for u in _owned_units(pid, ids):
 		if u.def["dmg"] > 0:
 			u.task = {"kind": &"attack", "tid": target_id, "ptid": target_id, "cell": _cell_of(tgt)}
@@ -578,11 +582,17 @@ func _combat_step(u: Node, tgt: Node, dt: float) -> void:
 	if dist <= float(u.def["range_t"]):
 		u.path.clear()   # atama degil: u.path tipli Array, Variant uzerinden [] atanamaz
 		u.path_i = 0
+		# havan KURULUMU: durduktan sonra setup_s saniye bekler, sonra ates
+		if u.setup_t > 0.0:
+			u.setup_t = maxf(0.0, u.setup_t - dt)
+			return
 		u.flags |= D.FLAG_ATTACKING
 		if u.cooldown <= 0.0:
 			_fire(u, tgt)
 		return
-	# kovala: hedef yer degistirdiyse yeniden yol (15 tick frenli)
+	# kovala: hedef yer degistirdiyse yeniden yol (15 tick frenli);
+	# hareket kurulumu bozar (havan tasinirken tekrar kurulmak zorunda)
+	u.setup_t = u.def.get("setup_s", 0.0)
 	u.flags |= D.FLAG_MOVING
 	_chase(u, tgt, dt)
 
@@ -699,14 +709,19 @@ func _fire(att: Node, tgt: Node) -> void:
 	att.cooldown = att.def["cooldown_s"]
 	var splash: float = att.def.get("splash_t", 0.0)
 
-	# --- havan: mermi her zaman hedefin CEVRESINE sacilir, alana vurur ---
+	# --- havan: mermi hedefin CEVRESINE sacilir ve havadan SUZULEREK gider;
+	# --- hasar mermi YERE DUSUNCE uygulanir (kosan birimler kacabilir) ---
 	if att.def.get("arc", false):
 		var sc: float = att.def.get("scatter_t", 0.0) * D.TILE
 		var sa := rng.randf() * TAU
 		var impact: Vector2 = tgt.position + Vector2(cos(sa), sin(sa)) * (rng.randf() * sc)
-		Net.ev(D.Ev.TRACER, [att.position, impact, 0])
-		Net.ev(D.Ev.IMPACT, [impact, 0.9])
-		_apply_area(att, tgt.owner_pid, impact, splash, 1.0)
+		var flight: float = clampf(
+			att.position.distance_to(impact) / D.SHELL_SPEED, D.SHELL_MIN_T, D.SHELL_MAX_T)
+		Net.ev(D.Ev.SHELL, [att.position, impact, flight])
+		shells.append({
+			"at": impact, "t": flight, "def_id": att.def_id, "def": att.def,
+			"pid": att.owner_pid, "splash": splash,
+		})
 		return
 
 	# --- SIPER: hedef saglam dost kum torbasinin yanindaysa direkt atislarin
@@ -724,7 +739,7 @@ func _fire(att: Node, tgt: Node) -> void:
 		if splash > 0.0:
 			# sapan roket yine patlar: dustugu yerde alan hasari
 			Net.ev(D.Ev.IMPACT, [mp, 0.8])
-			_apply_area(att, tgt.owner_pid, mp, splash, 0.5)
+			_area_damage(att.def_id, att.def, att.owner_pid, mp, splash, 0.5)
 		else:
 			Net.ev(D.Ev.MISS_FX, [mp])
 		return
@@ -738,25 +753,42 @@ func _fire(att: Node, tgt: Node) -> void:
 	if splash > 0.0:
 		Net.ev(D.Ev.IMPACT, [tgt.position, 0.8])
 		for o in GameState.entities.values():
-			if o == tgt or o.owner_pid != tgt.owner_pid:
+			# FFA: sicrama ATAN haric herkese (ucuncu taraflara da) deger
+			if o == tgt or o.owner_pid == att.owner_pid:
 				continue
 			if _dist_t(o, tgt) <= splash:
 				victims.append([o, attack_damage(att.def_id, att.def, o.def_id, o.def, 0.0) * 0.5])
 	_apply_damage(victims)
 
 
-func _apply_area(att: Node, victim_pid: int, at: Vector2, radius_t: float, mult: float) -> void:
-	## Noktasal patlama: yaricap icindeki TUM victim_pid varliklarina hasar.
+func _tick_shells(dt: float) -> void:
+	## Havadaki havan mermileri: ucus suresi dolunca dustugu yerde patlar.
+	## (atan birim bu arada olmus olabilir; def kopyasi mermide tasinir)
+	var i := 0
+	while i < shells.size():
+		shells[i]["t"] -= dt
+		if shells[i]["t"] > 0.0:
+			i += 1
+			continue
+		var s: Dictionary = shells[i]
+		shells.remove_at(i)
+		Net.ev(D.Ev.IMPACT, [s["at"], 0.9])
+		_area_damage(s["def_id"], s["def"], s["pid"], s["at"], s["splash"], 1.0)
+
+
+func _area_damage(att_def_id: StringName, att_def: Dictionary, shooter_pid: int,
+		at: Vector2, radius_t: float, mult: float) -> void:
+	## Noktasal patlama: yaricap icinde ATAN haric HERKESE hasar (FFA).
 	var victims: Array = []
 	for o in GameState.entities.values():
-		if o.owner_pid != victim_pid:
+		if o.owner_pid == shooter_pid:
 			continue
 		var d: float = o.position.distance_to(at) / float(D.TILE)
 		if o.def.has("size"):
 			var r: Rect2 = o.footprint_px()
 			d = at.clamp(r.position, r.position + r.size).distance_to(at) / float(D.TILE)
 		if d <= radius_t:
-			victims.append([o, attack_damage(att.def_id, att.def, o.def_id, o.def, 0.0) * mult])
+			victims.append([o, attack_damage(att_def_id, att_def, o.def_id, o.def, 0.0) * mult])
 	_apply_damage(victims)
 
 
@@ -828,6 +860,8 @@ func _nearest_enemy_unit(e: Node, range_t: float) -> Node:
 	for o in GameState.entities.values():
 		if o.owner_pid == e.owner_pid or not o.def.has("speed_t"):
 			continue
+		if o.def.has("mine"):
+			continue   # gizli mayinlar otomatik hedeflenemez
 		var d := _dist_t(e, o)
 		if d <= range_t and d < bd:
 			bd = d
@@ -845,6 +879,8 @@ func _nearest_enemy(e: Node, range_t: float) -> Node:
 	for o in GameState.entities.values():
 		if o.owner_pid == e.owner_pid:
 			continue
+		if o.def.has("mine"):
+			continue   # rakibin GIZLI mayini: gorunmez, otomatik hedeflenemez
 		var d := _dist_t(e, o)
 		if d > range_t:
 			continue
@@ -928,6 +964,7 @@ func _separate_units() -> void:
 
 func _set_move(u: Node, cell: Vector2i) -> void:
 	u.task = {"kind": &"move", "cell": cell}
+	u.setup_t = u.def.get("setup_s", 0.0)   # tasinan havan yeniden kurulur
 	_repath(u)
 
 
