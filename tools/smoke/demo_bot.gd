@@ -71,6 +71,33 @@ func _go() -> void:
 		get_tree().current_scene.cam.position = rally
 		_spread_diag.call_deferred(ids, rally)
 
+	# --hold-test: P1 piyadesi KONUSLU, P2 piyadesi 5 tile oteden aggro'yla
+	# kosup gelir; konuslu olan YERINDEN OYNAMAMALI ama menzile gireni vurmali
+	if arg_has(&"--hold-test"):
+		# sehirdeki demo birimlerinden UZAK bir arena (karismasinlar)
+		var hu: Node = sim.spawn_unit(&"rifleman", 1, sim.cell_center(tl + Vector2i(14, -14)))
+		sim.handle_hold(1, PackedInt32Array([hu.id]), true)
+		var foe: Node = sim.spawn_unit(&"rifleman", 2, sim.cell_center(tl + Vector2i(19, -14)))
+		sim.recount_pop()
+		_hold_diag.call_deferred(hu, hu.position, foe)
+
+	# secim: varsayilan isci (insa menusu); --select=<birim> ile degisir
+	# (orn. --select=mortar -> menzil halkasi gorseli)
+	var want: StringName = &"worker"
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--select="):
+			want = StringName(arg.get_slice("=", 1))
+	var game := get_tree().current_scene
+	var ic: Node = game.get_node_or_null("InputController")
+	if ic != null:
+		for e in GameState.entities.values():
+			if e.owner_pid == 1 and e.def_id == want:
+				var sel: Array[int] = [e.id]
+				ic._set_selection(sel)
+				if arg_has(&"--cam-select"):
+					game.cam.position = e.position
+				break
+
 
 func _spread_diag(ids: PackedInt32Array, rally: Vector2) -> void:
 	await get_tree().create_timer(3.0).timeout
@@ -89,22 +116,13 @@ func _spread_diag(ids: PackedInt32Array, rally: Vector2) -> void:
 	print("SPREAD_DIAG yakin=", moved, "/", ids.size(), " ayni_hucre_max=", worst,
 		" ilk_task=", GameState.ent(ids[0]).task if GameState.ent(ids[0]) != null else "?")
 
-	# secim: varsayilan isci (insa menusu); --select=<birim> ile degisir
-	# (orn. --select=mortar -> menzil halkasi gorseli)
-	var want: StringName = &"worker"
-	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--select="):
-			want = StringName(arg.get_slice("=", 1))
-	var game := get_tree().current_scene
-	var ic: Node = game.get_node_or_null("InputController")
-	if ic != null:
-		for e in GameState.entities.values():
-			if e.owner_pid == 1 and e.def_id == want:
-				var sel: Array[int] = [e.id]
-				ic._set_selection(sel)
-				if arg_has(&"--cam-select"):
-					game.cam.position = e.position
-				break
+
+func _hold_diag(hu: Node, start: Vector2, foe: Node) -> void:
+	await get_tree().create_timer(5.0).timeout
+	var moved: float = hu.position.distance_to(start) if is_instance_valid(hu) else -1.0
+	var foe_hp: float = foe.hp if is_instance_valid(foe) and GameState.entities.has(foe.id) else 0.0
+	var hold_s: String = str(hu.hold) if is_instance_valid(hu) else "?"
+	print("HOLD_DIAG p1_moved_px=%.1f hold=%s foe_hp=%.0f" % [moved, hold_s, foe_hp])
 
 
 func arg_has(flag: StringName) -> bool:

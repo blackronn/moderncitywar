@@ -74,6 +74,28 @@ func _unhandled_input(event: InputEvent) -> void:
 		# mayin suphesi isareti (lokal)
 		var cell := Vector2i((get_global_mouse_position() / float(D.TILE)).floor())
 		game.toggle_marker(cell)
+	elif event is InputEventKey and event.pressed and event.keycode == KEY_H:
+		toggle_hold()
+
+
+func toggle_hold() -> void:
+	## H: secili askerleri KONUSLANDIR / konuslanmayi kaldir.
+	## Konuslu birim yerinden kimildamaz; menziline gireni vurur ama kovalamaz.
+	var ids := PackedInt32Array()
+	var any_free := false
+	for id in selected:
+		var e: Node = GameState.ent(id)
+		if e == null or not e.def.has("speed_t"):
+			continue
+		if e.def.get("dmg", 0) <= 0 and not e.def.has("heal_rate"):
+			continue
+		ids.append(id)
+		if (e.flags & D.FLAG_HOLDING) == 0:
+			any_free = true
+	if ids.is_empty():
+		return
+	Net.send_hold(ids, any_free)   # karisik secimde once HEPSINI konuslandir
+	Bus.toast.emit(Tr.t(&"hold_on" if any_free else &"hold_off"))
 
 
 func _try_place(wp: Vector2) -> void:

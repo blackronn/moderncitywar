@@ -4,7 +4,7 @@ extends Node
 ## preload edip dogrudan kullanir. Sim dosyalari da autoload yerine
 ## `const D := preload(...)` ile erisir.
 
-const VERSION := "0.7.0"
+const VERSION := "0.7.1"
 
 # --- oyuncular ---
 const MAX_PLAYERS := 4
@@ -59,6 +59,7 @@ const FLAG_GATHERING := 4
 const FLAG_CONSTRUCTING := 8
 const FLAG_PRODUCING := 16
 const FLAG_HEALING := 32
+const FLAG_HOLDING := 64     # konuslanmis: yerinden kimildamaz, kovalamaz
 
 # hangi tile hangi kaynagi verir + saniyelik toplama hizi
 # (x2 tempo: oyunun 20-25 dk'da bitmesi hedefi — kaynak cok yavas geliyordu)

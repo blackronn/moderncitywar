@@ -23,6 +23,7 @@ var task := {}              # {"kind": &"idle"/&"move"/&"gather"/&"build"/&"atta
 var cooldown := 0.0
 var repath_block := 0       # tekrar yol arama frenleyici (tick)
 var setup_t := 0.0          # havan kurulumu: durduktan sonra ates icin kalan sn
+var hold := false           # konuslanma: yerinden kimildamaz, dusman kovalamaz
 
 # --- istemci interpolasyonu ---
 var _has_snap := false
@@ -167,6 +168,13 @@ func set_hp(v: float) -> void:
 
 
 func _draw() -> void:
+	if flags & D.FLAG_HOLDING:
+		# konuslanma isareti: ayaklarin altinda amber cift kose dirsegi
+		var hc := Color(0.95, 0.78, 0.3, 0.95)
+		draw_line(Vector2(-6, 9), Vector2(-3, 9), hc, 1.0)
+		draw_line(Vector2(-6, 9), Vector2(-6, 6), hc, 1.0)
+		draw_line(Vector2(6, 9), Vector2(3, 9), hc, 1.0)
+		draw_line(Vector2(6, 9), Vector2(6, 6), hc, 1.0)
 	if selected:
 		draw_arc(Vector2(0, 4), 8.0, 0.0, TAU, 20, Color(1, 1, 1, 0.9), 1.0)
 		# vurus alani halkasi: menzil yaricapi (tile x 16 px)

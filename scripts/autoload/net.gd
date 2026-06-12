@@ -347,6 +347,13 @@ func send_attack(ids: PackedInt32Array, target_id: int) -> void:
 		cmd_attack.rpc_id(1, ids, target_id)
 
 
+func send_hold(ids: PackedInt32Array, on: bool) -> void:
+	if is_host():
+		if sim != null: sim.handle_hold(1, ids, on)
+	else:
+		cmd_hold.rpc_id(1, ids, on)
+
+
 func send_declare_war() -> void:
 	if is_host():
 		if sim != null: sim.handle_declare_war(1)
@@ -415,6 +422,13 @@ func cmd_attack(ids: PackedInt32Array, target_id: int) -> void:
 	var pid := _cmd_pid()
 	if pid > 0 and sim != null:
 		sim.handle_attack(pid, ids, target_id)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func cmd_hold(ids: PackedInt32Array, on: bool) -> void:
+	var pid := _cmd_pid()
+	if pid > 0 and sim != null:
+		sim.handle_hold(pid, ids, on)
 
 
 @rpc("any_peer", "call_remote", "reliable")

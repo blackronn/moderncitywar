@@ -410,8 +410,24 @@ func handle_attack(pid: int, ids: PackedInt32Array, target_id: int) -> void:
 		if u.def["dmg"] > 0:
 			u.task = {"kind": &"attack", "tid": target_id, "ptid": target_id, "cell": _cell_of(tgt)}
 			u.repath_block = 0
+			u.hold = false   # acik saldiri emri konuslanmayi bozar (kovalar)
 		else:
 			_set_move(u, _cell_of(tgt))   # silahsizlar (isci) sadece yurur
+
+
+func handle_hold(pid: int, ids: PackedInt32Array, on: bool) -> void:
+	## Konuslan(dirma): birim oldugu yere cakilir, menziline gireni vurur ama
+	## ASLA kovalamaz. Yurutme/saldiri emri veya tekrar H bozar.
+	if GameState.eliminated.has(pid):
+		return
+	for u in _owned_units(pid, ids):
+		if u.def.get("dmg", 0) <= 0 and not u.def.has("heal_rate"):
+			continue   # isci icin anlamsiz
+		u.hold = on
+		if on:
+			u.path.clear()
+			u.path_i = 0
+			u.task = {"kind": &"idle"}
 
 
 func handle_declare_war(pid: int) -> void:
@@ -515,6 +531,8 @@ func _tick_units(dt: float) -> void:
 	var builders_on := {}   # building id -> kanal yapan isci sayisi
 	for u in _units():
 		u.flags = 0
+		if u.hold:
+			u.flags |= D.FLAG_HOLDING
 		var kind: StringName = u.task.get("kind", &"idle")
 		match kind:
 			&"move":
@@ -596,7 +614,10 @@ func _tick_combat(dt: float) -> void:
 			if tgt == null:
 				u.task = {"kind": &"idle"}
 		if tgt == null and u.task.get("kind") == &"idle":
-			tgt = _nearest_enemy(u, u.def["aggro_t"])
+			# konuslanmis birim yalnizca MENZILINE gireni hedefler (kovalamaz);
+			# normal birim aggro yaricapinda gordugune kosar
+			var acq: float = u.def["range_t"] if u.hold else u.def["aggro_t"]
+			tgt = _nearest_enemy(u, acq)
 			if tgt != null:
 				u.task = {"kind": &"attack", "tid": tgt.id, "ptid": 0, "cell": _cell_of(tgt)}
 				u.repath_block = 0
@@ -624,6 +645,10 @@ func _combat_step(u: Node, tgt: Node, dt: float) -> void:
 		u.flags |= D.FLAG_ATTACKING
 		if u.cooldown <= 0.0:
 			_fire(u, tgt)
+		return
+	if u.hold:
+		# konuslu: ASLA kovalamaz; menzilden cikan hedefi birakir
+		u.task = {"kind": &"idle"}
 		return
 	# kovala: hedef yer degistirdiyse yeniden yol (15 tick frenli);
 	# hareket kurulumu bozar (havan tasinirken tekrar kurulmak zorunda)
@@ -702,7 +727,9 @@ func _tick_healers(dt: float) -> void:
 				tgt = null
 				u.task = {"kind": &"idle"}
 		if tgt == null:
-			tgt = _nearest_damaged_friendly(u, u.def["aggro_t"])
+			# konuslu sihhiyeci de kovalamaz: yalnizca menzilindekini iyilestirir
+			var hacq: float = u.def["range_t"] if u.hold else u.def["aggro_t"]
+			tgt = _nearest_damaged_friendly(u, hacq)
 			if tgt != null:
 				u.task = {"kind": &"heal", "tid": tgt.id, "cell": _cell_of(tgt)}
 				u.repath_block = 0
@@ -718,6 +745,8 @@ func _tick_healers(dt: float) -> void:
 				Net.ev(D.Ev.TRACER, [u.position, tgt.position, 1])   # yesil isin
 				fx_t = 0.5
 			u.task["fx"] = fx_t
+		elif u.hold:
+			u.task = {"kind": &"idle"}   # konuslu: pesinden gitmez
 		else:
 			u.flags |= D.FLAG_MOVING
 			_chase(u, tgt, dt)
@@ -1016,6 +1045,7 @@ func _push_ok(u: Node, push: Vector2) -> bool:
 func _set_move(u: Node, cell: Vector2i) -> void:
 	u.task = {"kind": &"move", "cell": cell}
 	u.setup_t = u.def.get("setup_s", 0.0)   # tasinan havan yeniden kurulur
+	u.hold = false                           # yurutme emri konuslanmayi bozar
 	_repath(u)
 
 

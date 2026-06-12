@@ -697,6 +697,24 @@ func _refresh_panel() -> void:
 			fb.pressed.connect(_on_formation.bind(fi))
 			form_box.add_child(fb)
 
+	# konuslan butonu: en az bir savas birimi/sihhiyeci seciliyse
+	var holdable := false
+	var all_holding := true
+	for e in units:
+		if e.def.get("dmg", 0) > 0 or e.def.has("heal_rate"):
+			holdable = true
+			if (e.flags & D.FLAG_HOLDING) == 0:
+				all_holding = false
+	if holdable:
+		var hb := Button.new()
+		hb.text = Tr.t(&"hold")
+		UiKit.button(hb, 6, Color("#f3c64a") if all_holding else Color.TRANSPARENT)
+		hb.tooltip_text = Tr.t(&"hold_on")
+		hb.pressed.connect(func():
+			input_ctrl.toggle_hold()
+			_refresh_panel())
+		form_box.add_child(hb)
+
 	# insa menusu 2 satira tasabilir (11 kart): panel yuksekligi icerige gore
 	bottom.offset_top = -208.0 if has_worker else -124.0
 
