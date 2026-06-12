@@ -4,7 +4,7 @@ extends Node
 ## preload edip dogrudan kullanir. Sim dosyalari da autoload yerine
 ## `const D := preload(...)` ile erisir.
 
-const VERSION := "0.7.1"
+const VERSION := "0.7.2"
 
 # --- oyuncular ---
 const MAX_PLAYERS := 4
@@ -114,7 +114,7 @@ const UNITS := {
 		# sabit hedef/binalara olumcul, kosan orduya karsi zayif
 		"cost": {"food": 90, "money": 130}, "hp": 60, "dmg": 35, "range_t": 7.5, "cooldown_s": 4.5,
 		"speed_t": 1.6, "pop": 3, "klass": Klass.INFANTRY, "train_s": 18.0, "aggro_t": 7.0,
-		"splash_t": 1.3, "arc": true, "scatter_t": 0.9, "setup_s": 2.0,
+		"splash_t": 1.6, "arc": true, "scatter_t": 0.9, "setup_s": 2.0,
 	},
 	&"tank": {
 		"cost": {"money": 150, "stone": 80}, "hp": 450, "dmg": 24, "range_t": 4.0, "cooldown_s": 2.0,
@@ -128,10 +128,15 @@ const UNITS := {
 	},
 }
 
-# havan mermisi ucusu: yavas suzulur (px/sn) — uzaga atis = uzun ucus
-const SHELL_SPEED := 70.0
-const SHELL_MIN_T := 0.9
-const SHELL_MAX_T := 2.6
+# havan mermisi ucusu (px/sn) — uzaga atis = uzun ucus.
+# DODGE DENGESI (birim hizina gore): patlama yaricapi 1.6t = 25.6 px;
+# komando (48 px/sn) hemen her atistan, piyade/sihhiyeci (35+) uzun
+# atislardan TETIKTEYSE kacar; nisanci/mg/rpg ancak max menzilde;
+# havanci (26) ve TANK (22) pratikte KACAMAZ (karda/engebede hic).
+const SHELL_SPEED := 95.0
+const SHELL_MIN_T := 0.7
+const SHELL_MAX_T := 1.6
+const SHELL_FALLOFF_T := 0.6         # ic cember orani: disinda hasar x0.6
 
 # --- binalar ---
 # size: tile cinsinden footprint, build_s: 1 isciyle insaat suresi, rate: pasif uretim/sn

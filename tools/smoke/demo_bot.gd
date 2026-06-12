@@ -81,6 +81,21 @@ func _go() -> void:
 		sim.recount_pop()
 		_hold_diag.call_deferred(hu, hu.position, foe)
 
+	# --dodge-test: iki izole arena; konuslu havanlar yanal mekik atan
+	# hedeflere atis yapar. TANK (22 px/sn) yakalanmali, KOMANDO (48) kacmali.
+	if arg_has(&"--dodge-test"):
+		var ma: Node = sim.spawn_unit(&"mortar", 2, sim.cell_center(tl + Vector2i(20, -17)))
+		var mb: Node = sim.spawn_unit(&"mortar", 2, sim.cell_center(tl + Vector2i(20, -7)))
+		sim.handle_hold(2, PackedInt32Array([ma.id, mb.id]), true)
+		ma.setup_t = 0.0
+		mb.setup_t = 0.0
+		var tank: Node = sim.spawn_unit(&"tank", 1, sim.cell_center(tl + Vector2i(14, -18)))
+		var cmd: Node = sim.spawn_unit(&"commando", 1, sim.cell_center(tl + Vector2i(14, -8)))
+		sim.recount_pop()
+		_dodge_walk(tank, tl + Vector2i(14, -18))
+		_dodge_walk(cmd, tl + Vector2i(14, -8))
+		_dodge_diag.call_deferred(tank, cmd)
+
 	# secim: varsayilan isci (insa menusu); --select=<birim> ile degisir
 	# (orn. --select=mortar -> menzil halkasi gorseli)
 	var want: StringName = &"worker"
@@ -115,6 +130,23 @@ func _spread_diag(ids: PackedInt32Array, rally: Vector2) -> void:
 		worst = maxi(worst, cells[c])
 	print("SPREAD_DIAG yakin=", moved, "/", ids.size(), " ayni_hucre_max=", worst,
 		" ilk_task=", GameState.ent(ids[0]).task if GameState.ent(ids[0]) != null else "?")
+
+
+func _dodge_walk(u: Node, base: Vector2i) -> void:
+	## 12 sn boyunca 3'er hucre yanal mekik: surekli hareket = kacma denemesi.
+	for i in 6:
+		if not is_instance_valid(u) or not GameState.entities.has(u.id):
+			return
+		var off := Vector2i(0, 3 if i % 2 == 0 else -3)
+		Net.sim.handle_move(1, PackedInt32Array([u.id]), Net.sim.cell_center(base + off))
+		await get_tree().create_timer(2.0).timeout
+
+
+func _dodge_diag(tank: Node, cmd: Node) -> void:
+	await get_tree().create_timer(13.0).timeout
+	var t_hp: float = tank.hp if is_instance_valid(tank) and GameState.entities.has(tank.id) else 0.0
+	var c_hp: float = cmd.hp if is_instance_valid(cmd) and GameState.entities.has(cmd.id) else 0.0
+	print("DODGE_DIAG tank_hp=%.0f/450 komando_hp=%.0f/120" % [t_hp, c_hp])
 
 
 func _hold_diag(hu: Node, start: Vector2, foe: Node) -> void:

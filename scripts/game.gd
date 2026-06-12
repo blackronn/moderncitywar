@@ -215,11 +215,13 @@ func _death_visual(node: Node) -> void:
 		spawn_fx(&"explosion", node.position, 1.2 * size.x)
 
 
-func spawn_shell(from: Vector2, to: Vector2, flight: float) -> void:
-	## Havan mermisi: yay cizerek suzulur; patlama IMPACT event'iyle ayri gelir.
+func spawn_shell(from: Vector2, to: Vector2, flight: float, splash_t := 1.6) -> void:
+	## Havan mermisi: yay cizerek suzulur; dusme noktasinda KIRMIZI uyari
+	## halkasi belirir (iki taraf da gorur — kacma penceresi adil).
+	## Patlama IMPACT event'iyle ayri gelir.
 	var s: Node2D = preload("res://scripts/shell_fx.gd").new()
 	fx.add_child(s)
-	s.launch(from, to, flight)
+	s.launch(from, to, flight, splash_t * float(D.TILE))
 
 
 func spawn_fx(fx_id: StringName, at: Vector2, fx_scale := 1.0, ttl := 0.0) -> void:

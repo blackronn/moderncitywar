@@ -599,7 +599,8 @@ func _apply_event(kind: int, args: Array) -> void:
 		D.Ev.SHELL:
 			var scene := get_tree().current_scene
 			if scene != null and scene.has_method("spawn_shell"):
-				scene.spawn_shell(args[0], args[1], args[2])
+				scene.spawn_shell(args[0], args[1], args[2],
+					args[3] if args.size() > 3 else 1.6)
 		D.Ev.ELIMINATED:
 			var who: int = args[0]
 			GameState.eliminated[who] = true

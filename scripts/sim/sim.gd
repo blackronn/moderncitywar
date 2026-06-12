@@ -781,7 +781,7 @@ func _fire(att: Node, tgt: Node) -> void:
 		var impact: Vector2 = tgt.position + Vector2(cos(sa), sin(sa)) * (rng.randf() * sc)
 		var flight: float = clampf(
 			att.position.distance_to(impact) / D.SHELL_SPEED, D.SHELL_MIN_T, D.SHELL_MAX_T)
-		Net.ev(D.Ev.SHELL, [att.position, impact, flight])
+		Net.ev(D.Ev.SHELL, [att.position, impact, flight, splash])
 		shells.append({
 			"at": impact, "t": flight, "def_id": att.def_id, "def": att.def,
 			"pid": att.owner_pid, "splash": splash,
@@ -843,6 +843,7 @@ func _tick_shells(dt: float) -> void:
 func _area_damage(att_def_id: StringName, att_def: Dictionary, shooter_pid: int,
 		at: Vector2, radius_t: float, mult: float) -> void:
 	## Noktasal patlama: yaricap icinde ATAN haric HERKESE hasar (FFA).
+	## Ic cemberde tam, dis halkada azalan hasar (kenardan yakalanma adil).
 	var victims: Array = []
 	for o in GameState.entities.values():
 		if o.owner_pid == shooter_pid:
@@ -852,7 +853,8 @@ func _area_damage(att_def_id: StringName, att_def: Dictionary, shooter_pid: int,
 			var r: Rect2 = o.footprint_px()
 			d = at.clamp(r.position, r.position + r.size).distance_to(at) / float(D.TILE)
 		if d <= radius_t:
-			victims.append([o, attack_damage(att_def_id, att_def, o.def_id, o.def, 0.0) * mult])
+			var falloff := 1.0 if d <= radius_t * D.SHELL_FALLOFF_T else 0.6
+			victims.append([o, attack_damage(att_def_id, att_def, o.def_id, o.def, 0.0) * mult * falloff])
 	_apply_damage(victims)
 
 
